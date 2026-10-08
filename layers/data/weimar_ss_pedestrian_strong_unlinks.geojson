@@ -1,0 +1,1 @@
+{"type":"FeatureCollection","name":"weimar_ss_pedestrian_strong_unlinks","features":[{"type":"Feature","properties":{"network":"pedestrian","a":"AX_Fahrwegachse:Funktion=5212","b":"AX_WegPfadSteig:Art=1110","aBridge":false,"bBridge":true},"geometry":{"type":"Point","coordinates":[11.325432976562078,50.99234509846208]}}]}
