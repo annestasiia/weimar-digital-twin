@@ -2,7 +2,7 @@
  *
  * The page shows FOUR independent, stacked map blocks, one per scroll:
  *
- *   1. Computational Design        — viewport "computational"  — MapLibre
+ *   1. Simplified Model for Analysis — viewport "computational" — MapLibre
  *   2. Weimar Model                — viewport "weimar_model"    — MapLibre
  *   3. Transport                   — viewport "transport"      — MapLibre
  *   4. Blue-green Infrastructure   — viewport "blue_green"     — MapLibre
@@ -302,9 +302,16 @@ const BASE_BORDER_FALLBACK = {
   pointB: { lng: 11.348982, lat: 50.971379 },
 };
 
-const baseBorder = (() => {
-  let a = { ...BASE_BORDER_FALLBACK.pointA };
-  let b = { ...BASE_BORDER_FALLBACK.pointB };
+/** Base border 2.0: same top / left / right as the Base border, the bottom edge 25 % higher
+ *  (height x 0.75). Keep in sync with web/layers/base_border_2.json. */
+const BASE_BORDER_2_FALLBACK = {
+  pointA: { lng: 11.301259, lat: 51.007167 },
+  pointB: { lng: 11.348982, lat: 50.980326 },
+};
+
+function makeRectBorder(fallback) {
+  let a = { ...fallback.pointA };
+  let b = { ...fallback.pointB };
   const subs = new Set();
 
   const rect = () => ({
@@ -330,6 +337,37 @@ const baseBorder = (() => {
       subs.forEach((fn) => { try { fn(rect()); } catch (e) { console.error("[baseBorder]", e); } });
     },
   };
+}
+
+const baseBorder = makeRectBorder(BASE_BORDER_FALLBACK);
+const baseBorder2 = makeRectBorder(BASE_BORDER_2_FALLBACK);
+
+/** Hand-drawn curved Base border (web/layers/base_border_curve.json: a GeoJSON Polygon /
+ *  Feature / FeatureCollection, or { polygon: [[lng,lat], ...] }). Absent file = not available. */
+const baseBorderCurve = (() => {
+  let ring = null;   // open ring [[lng,lat], ...]
+  const subs = new Set();
+  const fire = () => subs.forEach((fn) => { try { fn(ring); } catch (e) { console.error("[baseBorderCurve]", e); } });
+  const outerRing = (o) => {
+    if (!o) return null;
+    if (Array.isArray(o.polygon)) return o.polygon;
+    if (o.type === "FeatureCollection") return outerRing((o.features || [])[0]);
+    if (o.type === "Feature") return outerRing(o.geometry);
+    if (o.type === "Polygon") return o.coordinates[0];
+    if (o.type === "MultiPolygon") return o.coordinates[0][0];
+    return null;
+  };
+  return {
+    get: () => ring,
+    available: () => !!ring,
+    subscribe(fn) { subs.add(fn); fn(ring); return () => subs.delete(fn); },
+    apply(obj) {
+      let r = outerRing(obj);
+      if (r && r.length > 3 && r[0][0] === r[r.length - 1][0] && r[0][1] === r[r.length - 1][1]) r = r.slice(0, -1);
+      ring = r && r.length >= 3 ? r.map(([x, y]) => [Number(x), Number(y)]) : null;
+      fire();
+    },
+  };
 })();
 
 async function loadBaseBorder() {
@@ -340,6 +378,21 @@ async function loadBaseBorder() {
   } catch (err) {
     console.warn("[boot] base_border.json not loaded, using built-in fallback:", err.message);
     baseBorder.apply(null);
+  }
+  try {
+    const res = await fetch("layers/base_border_2.json", { cache: "no-cache" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    baseBorder2.apply(await res.json());
+  } catch (err) {
+    console.warn("[boot] base_border_2.json not loaded, using built-in fallback:", err.message);
+    baseBorder2.apply(null);
+  }
+  try {
+    const res = await fetch("layers/base_border_curve.json", { cache: "no-cache" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    baseBorderCurve.apply(await res.json());
+  } catch (err) {
+    baseBorderCurve.apply(null);   // not drawn yet: the button stays disabled
   }
 }
 
@@ -411,6 +464,7 @@ function buildBlockChrome(mount, { title, subtitle, hostClass, withExport, expor
   tools.append(toolsBody);
 
   let exportToggleBtn = null, selectAreaBtn = null, exportRunBtn = null, baseBorderBtn = null;
+  let selectPolyBtn = null, baseBorder2Btn = null, baseBorderCurveBtn = null;
   let formatRow = null, formatSel = null, originCb = null, exportBarEl = null;
   if (withExport && exportMode !== "zone") {
     const exSec = h("div", "tools-section");
@@ -420,17 +474,26 @@ function buildBlockChrome(mount, { title, subtitle, hostClass, withExport, expor
 
     const toolbar = h("div", "sidebar-toolbar");
     selectAreaBtn = h("button", "btn-select-area", { type: "button", disabled: true, hidden: true });
-    selectAreaBtn.textContent = "Select area";
+    selectAreaBtn.textContent = "Select area (rectangle)";
+    // Curved export area: click the vertices, close on the first point / double-click / Enter.
+    selectPolyBtn = h("button", "btn-select-area", { type: "button", disabled: true, hidden: true });
+    selectPolyBtn.textContent = "Select area (curve)";
     // TASK 16 — same export path as "Select area", but the clip rectangle is the
     // fixed team-wide Base border (web/layers/base_border.json), not a drag.
     baseBorderBtn = h("button", "btn-base-border", { type: "button", disabled: true, hidden: true });
     baseBorderBtn.textContent = "Base border";
+    baseBorder2Btn = h("button", "btn-base-border", { type: "button", disabled: true, hidden: true,
+      title: "Base border 2.0: same top / left / right, bottom edge 25 % shorter" });
+    baseBorder2Btn.textContent = "Base border 2.0";
+    baseBorderCurveBtn = h("button", "btn-base-border", { type: "button", disabled: true, hidden: true,
+      title: "Curved Base border (web/layers/base_border_curve.json)" });
+    baseBorderCurveBtn.textContent = "Base border (curve)";
     exportRunBtn = h("button", "btn-export-run", { type: "button", disabled: true, hidden: true });
     exportRunBtn.textContent = "Export";
     // TASK 28 — export format: GeoJSON (zip, default) or 3DM (Rhino, built in the browser).
     formatRow = h("div", "export-format", { hidden: true });
     formatSel = h("select", "export-format-sel", { title: "Export format" });
-    for (const [v, t] of [["geojson", "GeoJSON (zip)"], ["3dm", "3DM (Rhino, zip)"]]) {
+    for (const [v, t] of [["geojson", "GeoJSON (zip)"], ["3dm", "3DM (Rhino, zip)"], ["svg", "SVG (2D plan, zip)"]]) {
       const o = h("option", null, { value: v }); o.textContent = t; formatSel.append(o);
     }
     const originLabel = h("label", "export-origin", { hidden: true,
@@ -440,7 +503,7 @@ function buildBlockChrome(mount, { title, subtitle, hostClass, withExport, expor
     originLabel.append(originCb, originTxt);
     formatRow.append(formatSel, originLabel);
     formatSel.addEventListener("change", () => { originLabel.hidden = formatSel.value !== "3dm"; });
-    toolbar.append(formatRow, selectAreaBtn, baseBorderBtn, exportRunBtn);
+    toolbar.append(formatRow, selectAreaBtn, selectPolyBtn, baseBorderBtn, baseBorder2Btn, baseBorderCurveBtn, exportRunBtn);
 
     // Progress / warning line — hidden until it has something to say.
     exportBarEl = h("div", "map-export", { hidden: true });
@@ -512,7 +575,7 @@ function buildBlockChrome(mount, { title, subtitle, hostClass, withExport, expor
 
   return {
     section, host, groupsEl, viewSwitch, btn2d, btn3d, terrainBtn, attributionEl, legendEl, metaEl,
-    exportToggleBtn, selectAreaBtn, baseBorderBtn, exportRunBtn, exportBarEl,
+    exportToggleBtn, selectAreaBtn, selectPolyBtn, baseBorderBtn, baseBorder2Btn, baseBorderCurveBtn, exportRunBtn, exportBarEl,
     formatRow, formatSel, originCb, pngBtn, pdfBtn, gridBtn, gridNote, annotBtn, annotCheck,
     zoneBtn, zoneClearBtn, zoneExportBtn, zoneStatus, gridCanvas, gridScaleEl,
   };
@@ -636,6 +699,7 @@ function renderSidebarItem(item, handlers, viewport) {
 
   const multi = layers.length > 1 && !item.categories;
   const subPaints = [];
+  const subRows = [];   // [{ layerId, el }] — for the per-sublayer export checkboxes
   const paint = () => {
     const n = layers.filter((l) => layerVisibleInViewport(l, viewport)).length;
     const on = layers.length > 0 && n === layers.length, partial = n > 0 && !on;
@@ -686,6 +750,7 @@ function renderSidebarItem(item, handlers, viewport) {
       });
       subPaints.push(sp); sp();
       sr.append(sn, se); panel.append(sr);
+      subRows.push({ layerId: l.id, el: sr });
     }
     caret.addEventListener("click", () => {
       panel.hidden = !panel.hidden;
@@ -730,7 +795,7 @@ function renderSidebarItem(item, handlers, viewport) {
   main.append(eye);
   row.append(main);
   if (panel) row.append(panel);
-  if (handlers.decorateRow) handlers.decorateRow(row, item.layers || [], item.name);
+  if (handlers.decorateRow) handlers.decorateRow(row, item.layers || [], item.name, subRows);
   return row;
 }
 
@@ -797,7 +862,16 @@ function attributionHtml(viewport, engineCredit, baseAttribution = BASE_ATTRIBUT
 
 const _emptyFC = () => ({ type: "FeatureCollection", features: [] });
 
+/** Corner ring of the export selection: the curved polygon when there is one, else the rectangle. */
+function _selectionRing(s) {
+  if (s.polygon && s.polygon.length >= 3) return s.polygon;
+  return [[s.west, s.south], [s.east, s.south], [s.east, s.north], [s.west, s.north]];
+}
+
 function _rectPolygon(s) {
+  if (s.polygon && s.polygon.length >= 3) {
+    return { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [[...s.polygon, s.polygon[0]]] } };
+  }
   return {
     type: "Feature",
     properties: {},
@@ -846,17 +920,57 @@ function _bboxIntersects(bb, s) {
   return !(bb.maxX < s.west || bb.minX > s.east || bb.maxY < s.south || bb.minY > s.north);
 }
 
+/** Exact test against a curved selection (open ring [[lng,lat]...]); the bbox test already passed. */
+function _geomHitsRing(g, ring) {
+  const pts = [];
+  const lines = [];      // [[x,y]...] each; polygon outer rings included
+  const polys = [];      // polygon outer rings
+  const walk = (gg) => {
+    if (!gg) return;
+    switch (gg.type) {
+      case "GeometryCollection": (gg.geometries || []).forEach(walk); break;
+      case "Point": pts.push(gg.coordinates); break;
+      case "MultiPoint": pts.push(...gg.coordinates); break;
+      case "LineString": lines.push(gg.coordinates); break;
+      case "MultiLineString": lines.push(...gg.coordinates); break;
+      case "Polygon": lines.push(gg.coordinates[0]); polys.push(gg.coordinates[0]); break;
+      case "MultiPolygon": for (const p of gg.coordinates) { lines.push(p[0]); polys.push(p[0]); } break;
+    }
+  };
+  walk(g);
+  for (const [x, y] of pts) if (_ptInPoly(ring, x, y)) return true;
+  for (const l of lines) {
+    for (const [x, y] of l) if (_ptInPoly(ring, x, y)) return true;
+    for (let i = 0; i < l.length - 1; i++) {
+      for (let j = 0; j < ring.length; j++) {
+        const q = ring[j], r = ring[(j + 1) % ring.length];
+        if (_segX(l[i][0], l[i][1], l[i + 1][0], l[i + 1][1], q[0], q[1], r[0], r[1])) return true;
+      }
+    }
+  }
+  for (const o of polys) if (_ptInPoly(o, ring[0][0], ring[0][1])) return true;   // selection inside a big polygon
+  return false;
+}
+
 function _geomIntersectsSelection(g, s) {
   if (!g) return false;
   if (g.type === "GeometryCollection")
     return (g.geometries || []).some((gg) => _geomIntersectsSelection(gg, s));
-  if (g.type === "Point" || g.type === "MultiPoint")
-    return _anyPositionInRect(g.coordinates, s);
+  if (g.type === "Point" || g.type === "MultiPoint") {
+    if (!_anyPositionInRect(g.coordinates, s)) return false;
+    return s.polygon ? _geomHitsRing(g, s.polygon) : true;
+  }
   if (!g.coordinates || !g.coordinates.length) return false;
-  return _bboxIntersects(_coordsBBox(g.coordinates), s);
+  if (!_bboxIntersects(_coordsBBox(g.coordinates), s)) return false;
+  return s.polygon ? _geomHitsRing(g, s.polygon) : true;
 }
 
 /** Clip one FeatureCollection to the selection rectangle per the rules above. */
+// Category filters currently set from the sidebar ("+" panel of rows such as "Parcels use"),
+// keyed `${viewport}:${layerId}` -> { prop, values } (values = array of allowed values).
+// The export applies the same filter, so it contains exactly what the map shows.
+const _categoryFilters = new Map();
+
 function clipFeatureCollection(fc, selection, layerId) {
   const feats = (fc && fc.features) || [];
   const kept = layerId === "weimar_admin_boundary"
@@ -906,7 +1020,13 @@ async function collectGroupFeatures(group, selection, resById) {
       throw new Error(`could not fetch layer "${id}": ${err.message}`);
     }
 
-    const clipped = clipFeatureCollection(fc, selection, id);
+    let clipped = clipFeatureCollection(fc, selection, id);
+    const flt = group.filters && group.filters.get(id);
+    if (flt) {
+      const allowed = new Set(flt.values);
+      clipped = { type: "FeatureCollection",
+        features: clipped.features.filter((f) => allowed.has(f.properties && f.properties[flt.prop])) };
+    }
     console.log(`[export] ${id}: ${(fc.features || []).length} → ${clipped.features.length} kept`);
     mergedFeatures.push(...clipped.features);
     layerMetas.push({ id, layer, res, featureCount: clipped.features.length });
@@ -938,8 +1058,8 @@ async function buildExportZip(viewport, groups, selection, opts = {}) {
     selection,
     selectionGeometry: _rectPolygon(selection).geometry,
     clipRules: {
-      points: "kept when inside the selection rectangle",
-      linesAndPolygons: "kept whole when the feature bbox intersects the selection (never cut at the border)",
+      points: "kept when inside the selection (rectangle or curve)",
+      linesAndPolygons: "kept whole when the feature touches the selection (rectangle: bbox test; curve: exact test); never cut at the border",
       weimar_admin_boundary: "always whole, never clipped",
     },
     layers: [],
@@ -1438,9 +1558,9 @@ async function build3dmExport(viewport, groups, selection, opts = {}) {
   if (opts.includeBaseBorder) {
     const lay = addLayer("Base border");
     const a = new rhino.ObjectAttributes(); a.layerIndex = lay.idx; a.name = "Base border";
-    const pl = new rhino.Polyline(5);
-    const { west: w, south: s, east: e, north: n } = selection;
-    for (const [lng, lat] of [[w, s], [e, s], [e, n], [w, n], [w, s]]) {
+    const ring = _selectionRing(selection);
+    const pl = new rhino.Polyline(ring.length + 1);
+    for (const [lng, lat] of [...ring, ring[0]]) {
       const [x, y] = _toUtm32(lng, lat); pl.add(x - ox, y - oy, 0);
     }
     doc.objects().addCurve(pl.toPolylineCurve(), a);
@@ -1465,8 +1585,8 @@ async function build3dmExport(viewport, groups, selection, opts = {}) {
     precisionNote: "All geometry is Extrusion / Brep / curve / point (double precision); no meshes. Absolute EPSG:25832 coordinates are exact.",
     selection, selectionGeometry: _rectPolygon(selection).geometry, selectionCrs: "EPSG:4326",
     clipRules: {
-      points: "kept when inside the selection rectangle",
-      linesAndPolygons: "kept whole when the feature bbox intersects the selection (never cut at the border)",
+      points: "kept when inside the selection (rectangle or curve)",
+      linesAndPolygons: "kept whole when the feature touches the selection (rectangle: bbox test; curve: exact test); never cut at the border",
       weimar_admin_boundary: "always whole, never clipped",
     },
     geometry: {
@@ -1514,6 +1634,163 @@ async function build3dmExport(viewport, groups, selection, opts = {}) {
   };
 }
 
+// ===========================================================================
+// SVG export — one 2D vector drawing, one <g> per platform layer (Illustrator /
+// Inkscape layers via inkscape:groupmode). Same fetch / clip path as the other
+// formats. Units: 1 SVG unit = 1 m in EPSG:25832, y flipped (north up), shifted
+// to an integer-metre origin that is written to manifest.json. Heights are not
+// represented (plan view); feature properties become data-* attributes.
+// ===========================================================================
+
+const _xmlEsc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const _svgNum = (v) => String(Math.round(v * 100) / 100);
+
+async function buildSvgExport(viewport, groups, selection, opts = {}) {
+  if (typeof JSZip === "undefined") throw new Error("JSZip is not loaded");
+  if (typeof proj4 === "undefined") throw new Error("proj4 not loaded");
+  const progress = opts.onProgress || (() => {});
+  const resById = new Map((manifest.resources || []).map((r) => [r.id, r]));
+  const generated = new Date().toISOString();
+
+  const sw = _toUtm32(selection.west, selection.south), ne = _toUtm32(selection.east, selection.north);
+  const ox = Math.floor(Math.min(sw[0], ne[0])), oy = Math.ceil(Math.max(sw[1], ne[1]));
+  const bounds = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+  const P = (lng, lat) => {
+    const [e, n] = _toUtm32(lng, lat);
+    const x = e - ox, y = oy - n;
+    if (x < bounds.x0) bounds.x0 = x; if (x > bounds.x1) bounds.x1 = x;
+    if (y < bounds.y0) bounds.y0 = y; if (y > bounds.y1) bounds.y1 = y;
+    return `${_svgNum(x)} ${_svgNum(y)}`;
+  };
+  const ringD = (ring, close) => {
+    let d = "";
+    ring.forEach(([lng, lat], i) => { d += `${i ? "L" : "M"}${P(lng, lat)}`; });
+    return d + (close ? "Z" : "");
+  };
+
+  const collected = [];
+  for (const group of groups) {
+    progress(`SVG: fetching “${group.name}”…`);
+    collected.push({ group, ...(await collectGroupFeatures(group, group.selection || selection, resById)) });
+  }
+
+  const layerStats = [];
+  const body = [];
+  let built = 0;
+  const total = collected.reduce((a, c) => a + c.mergedFeatures.length, 0);
+  for (const { group, mergedFeatures, layerMetas } of collected) {
+    const useMeta = layerMetas.find((m) => _isUseLayer(m.layer));
+    const useCats = useMeta ? (manifest[useMeta.layer.colorBy.palette || "useCategories"] || []) : [];
+    const colorOf = new Map(useCats.map((c) => [c.name, c.color]));
+    const st = { name: group.name, features: mergedFeatures.length, elements: 0, skipped: 0 };
+    const parts = [];
+    for (const f of mergedFeatures) {
+      const g = f.geometry;
+      const props = f.properties || {};
+      let attrs = "";
+      for (const [k, v] of Object.entries(_userStrings(props))) {
+        if (/^[A-Za-z_][\w.-]*$/.test(k)) attrs += ` data-${_xmlEsc(k.toLowerCase())}="${_xmlEsc(v)}"`;
+      }
+      const col = colorOf.get(props.useCategory);
+      const fill = ` fill="${_xmlEsc(col || "#e6e6e6")}"`;
+      if (!g) { st.skipped++; continue; }
+      if (g.type === "Polygon" || g.type === "MultiPolygon") {
+        const polys = g.type === "Polygon" ? [g.coordinates] : g.coordinates;
+        const d = polys.map((rings) => rings.map((r) => ringD(r, true)).join("")).join("");
+        parts.push(`<path class="poly"${fill} fill-rule="evenodd" d="${d}"${attrs}/>`); st.elements++;
+      } else if (g.type === "LineString" || g.type === "MultiLineString") {
+        const lines = g.type === "LineString" ? [g.coordinates] : g.coordinates;
+        const d = lines.filter((l) => l.length >= 2).map((l) => ringD(l, false)).join("");
+        if (!d) { st.skipped++; continue; }
+        parts.push(`<path class="line" d="${d}"${attrs}/>`); st.elements++;
+      } else if (g.type === "Point" || g.type === "MultiPoint") {
+        const pts = g.type === "Point" ? [g.coordinates] : g.coordinates;
+        for (const [lng, lat] of pts) {
+          const [cx, cy] = P(lng, lat).split(" ");
+          parts.push(`<circle class="pt" fill="${_xmlEsc(col || "#0d0d0d")}" cx="${cx}" cy="${cy}" r="1"${attrs}/>`); st.elements++;
+        }
+      } else st.skipped++;
+      if (++built % 250 === 0) {
+        progress(`SVG: building… ${built.toLocaleString()} / ${total.toLocaleString()}`);
+        await _tick();
+      }
+    }
+    const id = _xmlEsc(group.fileId);
+    body.push(`<g id="${id}" inkscape:groupmode="layer" inkscape:label="${_xmlEsc(group.name)}">\n${parts.join("\n")}\n</g>`);
+    layerStats.push(st);
+  }
+
+  if (opts.includeBaseBorder) {
+    const d = _selectionRing(selection).map(([lng, lat], i) => `${i ? "L" : "M"}${P(lng, lat)}`).join("") + "Z";
+    body.push(`<g id="base_border" inkscape:groupmode="layer" inkscape:label="Base border">\n<path class="border" d="${d}"/>\n</g>`);
+    layerStats.push({ name: "Base border", features: 1, elements: 1, skipped: 0 });
+  }
+
+  if (!isFinite(bounds.x0)) { bounds.x0 = 0; bounds.y0 = 0; bounds.x1 = 1; bounds.y1 = 1; }
+  const pad = 5;
+  const vx = Math.floor(bounds.x0 - pad), vy = Math.floor(bounds.y0 - pad);
+  const vw = Math.ceil(bounds.x1 + pad) - vx, vh = Math.ceil(bounds.y1 + pad) - vy;
+  const svg = [
+    `<?xml version="1.0" encoding="UTF-8"?>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="${vw}" height="${vh}" viewBox="${vx} ${vy} ${vw} ${vh}">`,
+    `<title>Data Twin City Weimar — ${_xmlEsc(viewport)}</title>`,
+    `<desc>EPSG:25832, 1 unit = 1 m, y flipped. x = Easting - ${ox}, y = ${oy} - Northing.</desc>`,
+    `<style>.poly{stroke:#0d0d0d;stroke-width:.3}.line{fill:none;stroke:#0d0d0d;stroke-width:.3}.border{fill:none;stroke:#0f5fb5;stroke-width:1;stroke-dasharray:6 3}</style>`,
+    ...body,
+    `</svg>`,
+  ].join("\n");
+
+  const zip = new JSZip();
+  const fileName = `weimar_${viewport}.svg`;
+  zip.file(fileName, svg);
+  const manifestOut = {
+    generated, viewport, format: "svg", file: fileName,
+    crs: "EPSG:25832", units: "1 SVG unit = 1 m",
+    origin: { originEasting: ox, originNorthingTop: oy,
+      note: "EPSG:25832 Easting = x + originEasting; Northing = originNorthingTop - y (y axis is flipped)" },
+    selection, selectionGeometry: _rectPolygon(selection).geometry, selectionCrs: "EPSG:4326",
+    clipRules: {
+      points: "kept when inside the selection (rectangle or curve)",
+      linesAndPolygons: "kept whole when the feature touches the selection (rectangle: bbox test; curve: exact test); never cut at the border",
+      weimar_admin_boundary: "always whole, never clipped",
+    },
+    geometry: "plan view only: polygons (evenodd, holes kept), polylines, points as 1 m circles; building heights are not drawn",
+    layers: layerStats.map((s, i) => ({
+      svgGroup: i < collected.length ? collected[i].group.fileId : "base_border", name: s.name,
+      featureCount: s.features, elementCount: s.elements, skipped: s.skipped,
+      attribution: i < collected.length
+        ? [...new Set(collected[i].layerMetas.map((m) => m.layer.attribution).filter(Boolean))].join(" / ")
+        : "Data Twin City Weimar — team-wide reference frame",
+      sourceLayers: i < collected.length ? collected[i].layerMetas.map((m) => m.id) : [],
+    })),
+  };
+  const attrib = [
+    "Data Twin City Weimar — SVG export", `Generated: ${generated}`, `Viewport: ${viewport}`,
+    `Selection (EPSG:4326): W ${selection.west}  S ${selection.south}  E ${selection.east}  N ${selection.north}`,
+    "CRS: EPSG:25832 (ETRS89 / UTM 32N), 1 SVG unit = 1 m",
+    "", "Base map shown for context is NOT part of this package:", "  © OpenStreetMap contributors (ODbL) · © CARTO", "",
+    "Exported layers", "==============", "",
+  ];
+  collected.forEach((c, i) => {
+    attrib.push(`- ${c.group.name}  [SVG group “${c.group.fileId}”]  (${layerStats[i].elements} element(s))`);
+    for (const m of c.layerMetas) {
+      attrib.push(`    ${m.layer.attribution || "(no attribution string on record)"}`);
+      attrib.push(`    Source: ${m.res ? m.res.name : m.layer.resourceId}${m.res && m.res.url ? `  <${m.res.url}>` : ""}`);
+    }
+    attrib.push("");
+  });
+  zip.file("manifest.json", JSON.stringify(manifestOut, null, 2));
+  zip.file("ATTRIBUTION.txt", attrib.join("\n"));
+  const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
+  const elTotal = layerStats.reduce((a, s) => a + s.elements, 0);
+  const empties = collected.filter((c) => c.mergedFeatures.length === 0).map((c) => c.group.fileId);
+  console.log(`[export] svg done — ${elTotal} elements, svg ${svg.length} B, zip ${blob.size} B`);
+  return {
+    blob, empties, total: groups.length, svg, manifestOut,
+    summary: `(${elTotal.toLocaleString()} elements, ${(svg.length / 1048576).toFixed(1)} MB .svg)`,
+  };
+}
+
 /**
  * Wires the export UI for one MapLibre viewport onto `map` / `ui`.
  * Sidebar buttons: "Export layers" (toggle) → reveals row checkboxes +
@@ -1551,7 +1828,24 @@ function createExportController({ map, viewport, ui }) {
     for (const r of rows) {
       if (!r.checkbox.checked || r.checkbox.disabled) continue;
       if (r.exportableIds.length === 0) continue;
-      groups.push({ fileId: r.fileId, name: r.name, ids: r.exportableIds });
+      // Multi-layer row: only the sublayers whose own export box is ticked.
+      const ids = r.subs.length
+        ? r.exportableIds.filter((id) => { const s = r.subs.find((x) => x.layerId === id); return !s || s.cb.checked; })
+        : r.exportableIds;
+      if (ids.length === 0) continue;
+      const filters = new Map();
+      for (const id of ids) { const f = _categoryFilters.get(`${viewport}:${id}`); if (f) filters.set(id, f); }
+      const first = [...filters.values()][0];
+      const suffix = first ? ` — ${first.values.length <= 3 ? first.values.join(", ") : first.values.length + " categories"}` : "";
+      const n0 = groups.length;
+      if (ids.length === r.exportableIds.length) { groups.push({ fileId: r.fileId, name: r.name + suffix, ids }); groups[n0].filters = filters; continue; }
+      if (ids.length === 1) {
+        const l = layerById(ids[0]);
+        groups.push({ fileId: ids[0], name: ((l && (l.subName || l.name)) || r.name) + suffix, ids });
+      } else {
+        groups.push({ fileId: _slug(`${r.name}_${ids.join("_")}`).slice(0, 80), name: r.name + suffix, ids });
+      }
+      groups[n0].filters = filters;
     }
     return groups;
   }
@@ -1559,7 +1853,10 @@ function createExportController({ map, viewport, ui }) {
   function refresh() {
     const n = checkedGroups().length;
     if (ui.selectAreaBtn) ui.selectAreaBtn.disabled = !active || n === 0;
+    if (ui.selectPolyBtn) ui.selectPolyBtn.disabled = !active || n === 0;
     if (ui.baseBorderBtn) ui.baseBorderBtn.disabled = !active || n === 0;
+    if (ui.baseBorder2Btn) ui.baseBorder2Btn.disabled = !active || n === 0;
+    if (ui.baseBorderCurveBtn) ui.baseBorderCurveBtn.disabled = !active || n === 0 || !baseBorderCurve.available();
     if (ui.exportRunBtn) ui.exportRunBtn.disabled = !(active && n > 0 && !!selection);
   }
 
@@ -1586,6 +1883,76 @@ function createExportController({ map, viewport, ui }) {
   function paintRect(s) {
     ensureRectLayers();
     map.getSource("__export_rect").setData(s ? _rectPolygon(s) : _emptyFC());
+  }
+
+  /** Curved selection from a ring [[lng,lat]...]: bbox for the fast test + the ring itself. */
+  function ringSelection(ring) {
+    const sel = { west: Infinity, east: -Infinity, south: Infinity, north: -Infinity, polygon: ring.map((p) => [p[0], p[1]]) };
+    for (const [x, y] of ring) {
+      if (x < sel.west) sel.west = x;
+      if (x > sel.east) sel.east = x;
+      if (y < sel.south) sel.south = y;
+      if (y > sel.north) sel.north = y;
+    }
+    return sel;
+  }
+
+  // Curved selection: click vertices; close by clicking the first point, double-click or Enter; Esc cancels.
+  function beginDrawPolygon() {
+    if (ui.selectPolyBtn.disabled) return;
+    if (disarmDraw) disarmDraw();
+    clearRectangle();
+    refresh();
+    ensureRectLayers();
+    map.dragPan.disable();
+    map.doubleClickZoom.disable();
+    map.getCanvas().style.cursor = "crosshair";
+    map.__drawing = true;
+    setStatus("Click the vertices of the export area · click the first point, double-click or press Enter to close · Esc cancels.");
+
+    const pts = [];
+    const paintPts = (cursor) => {
+      const ring = cursor ? [...pts, cursor] : pts;
+      const feats = [];
+      if (ring.length >= 3) feats.push({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [[...ring, ring[0]]] } });
+      else if (ring.length === 2) feats.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: ring } });
+      map.getSource("__export_rect").setData({ type: "FeatureCollection", features: feats });
+    };
+    const finish = () => {
+      teardown();
+      if (pts.length < 3) { clearRectangle(); setStatus("Need at least 3 points, try again."); refresh(); return; }
+      selection = ringSelection(pts);
+      selectionFromBaseBorder = false;
+      paintRect(selection);
+      setStatus("Curved area selected: click “Export” to download, or “Select area (curve)” again to redraw.");
+      refresh();
+    };
+    const onClick = (e) => {
+      if (pts.length >= 3) {
+        const a = map.project(pts[0]);
+        if (Math.hypot(a.x - e.point.x, a.y - e.point.y) < 12) return finish();
+      }
+      pts.push([e.lngLat.lng, e.lngLat.lat]);
+      paintPts();
+    };
+    const onDbl = (e) => { e.preventDefault(); if (pts.length >= 2) pts.pop(); finish(); };
+    const onMove = (e) => { if (pts.length) paintPts([e.lngLat.lng, e.lngLat.lat]); };
+    const onKey = (e) => {
+      if (e.key === "Escape") { teardown(); clearRectangle(); setStatus(""); refresh(); }
+      else if (e.key === "Enter") finish();
+    };
+    function teardown() {
+      map.off("click", onClick); map.off("dblclick", onDbl); map.off("mousemove", onMove);
+      document.removeEventListener("keydown", onKey);
+      map.dragPan.enable();
+      map.doubleClickZoom.enable();
+      map.getCanvas().style.cursor = "";
+      map.__drawing = false;
+      disarmDraw = null;
+    }
+    disarmDraw = teardown;
+    map.on("click", onClick); map.on("dblclick", onDbl); map.on("mousemove", onMove);
+    document.addEventListener("keydown", onKey);
   }
 
   function beginDraw() {
@@ -1636,6 +2003,7 @@ function createExportController({ map, viewport, ui }) {
     active = on;
     for (const r of rows) {
       r.wrapper.hidden = !on;
+      for (const sb of r.subs) sb.wrapper.hidden = !on;
       if (!on) r.checkbox.checked = false;
     }
     if (ui.exportToggleBtn) {
@@ -1643,7 +2011,10 @@ function createExportController({ map, viewport, ui }) {
       ui.exportToggleBtn.classList.toggle("active", on);
     }
     if (ui.selectAreaBtn) ui.selectAreaBtn.hidden = !on;
+    if (ui.selectPolyBtn) ui.selectPolyBtn.hidden = !on;
     if (ui.baseBorderBtn) ui.baseBorderBtn.hidden = !on;
+    if (ui.baseBorder2Btn) ui.baseBorder2Btn.hidden = !on;
+    if (ui.baseBorderCurveBtn) ui.baseBorderCurveBtn.hidden = !on;
     if (ui.exportRunBtn) ui.exportRunBtn.hidden = !on;
     if (ui.formatRow) ui.formatRow.hidden = !on;
     if (!on) {
@@ -1654,7 +2025,7 @@ function createExportController({ map, viewport, ui }) {
     refresh();
   }
 
-  function decorateRow(rowEl, layerIds, label) {
+  function decorateRow(rowEl, layerIds, label, subRows = []) {
     const main = rowEl.querySelector(".layer-main") || rowEl;
     const exportableIds = exportableIdsOf(layerIds);
     const wrapper = h("label", "export-check-wrap", { hidden: !active });
@@ -1665,33 +2036,64 @@ function createExportController({ map, viewport, ui }) {
     } else {
       wrapper.title = "Include this layer in the export package";
     }
-    cb.addEventListener("change", refresh);
     wrapper.append(cb);
     main.insertBefore(wrapper, main.firstChild);
+    // One export checkbox per sublayer of a multi-layer row ("Parcels" → roads & paths, …).
+    const subs = [];
+    for (const sr of subRows) {
+      if (!exportableIds.includes(sr.layerId)) continue;
+      const sw = h("label", "export-check-wrap", { hidden: !active, title: "Include this sublayer in the export" });
+      const scb = h("input", "export-check", { type: "checkbox" });
+      scb.checked = true;
+      scb.addEventListener("change", refresh);
+      sw.append(scb);
+      sr.el.insertBefore(sw, sr.el.firstChild);
+      subs.push({ layerId: sr.layerId, cb: scb, wrapper: sw });
+    }
+    cb.addEventListener("change", () => {
+      if (cb.checked && subs.length) {
+        // start from what is visible on the map; if nothing is, take all
+        const vis = subs.map((s) => { const l = layerById(s.layerId); return !!l && layerVisibleInViewport(l, viewport); });
+        const any = vis.some(Boolean);
+        subs.forEach((s, i) => { s.cb.checked = any ? vis[i] : true; });
+        const panel = rowEl.querySelector(".sub-panel"), caret = rowEl.querySelector(".cat-btn");
+        if (panel) { panel.hidden = false; if (caret) { caret.classList.add("open"); caret.textContent = "–"; } }
+      }
+      refresh();
+    });
     // Single-id rows keep the layer's own id as the filename (unchanged,
     // most rows); multi-id rows get one merged file named after the row.
     const fileId = exportableIds.length === 1 ? exportableIds[0] : _slug(label || exportableIds.join("_"));
-    rows.push({ rowEl, exportableIds, checkbox: cb, wrapper, fileId, name: label || exportableIds[0] || fileId });
+    rows.push({ rowEl, exportableIds, checkbox: cb, wrapper, subs, fileId, name: label || exportableIds[0] || fileId });
   }
 
   if (ui.exportToggleBtn)
     ui.exportToggleBtn.addEventListener("click", () => setActive(!active));
   if (ui.selectAreaBtn)
     ui.selectAreaBtn.addEventListener("click", beginDraw);
+  if (ui.selectPolyBtn)
+    ui.selectPolyBtn.addEventListener("click", beginDrawPolygon);
 
   // TASK 16 — "Base border": use the fixed team-wide rectangle
   // (web/layers/base_border.json) as the export selection. Nothing else about the
   // export flow changes — same fetch → clip → zip as "Select area".
-  if (ui.baseBorderBtn)
-    ui.baseBorderBtn.addEventListener("click", () => {
-      if (ui.baseBorderBtn.disabled) return;
+  const useBorder = (btn, getSel, label) => {
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      if (btn.disabled) return;
       if (disarmDraw) disarmDraw();
-      selection = { ...baseBorder.getRect() };
+      const sel = getSel();
+      if (!sel) return;
+      selection = sel;
       selectionFromBaseBorder = true;
       paintRect(selection);
-      setStatus("Base border set as export area — it will be included as its own layer. Click “⬇ Export” to download, or “Select area” to draw a custom one.");
+      setStatus(`${label} set as export area: it will be included as its own layer. Click “Export” to download, or draw a custom area.`);
       refresh();
     });
+  };
+  useBorder(ui.baseBorderBtn, () => ({ ...baseBorder.getRect() }), "Base border");
+  useBorder(ui.baseBorder2Btn, () => ({ ...baseBorder2.getRect() }), "Base border 2.0");
+  useBorder(ui.baseBorderCurveBtn, () => { const r = baseBorderCurve.get(); return r ? ringSelection(r) : null; }, "Curved Base border");
 
   async function runExport() {
     if (!ui.exportRunBtn || ui.exportRunBtn.disabled) return;
@@ -1707,12 +2109,14 @@ function createExportController({ map, viewport, ui }) {
           ...border, localOrigin: !!(ui.originCb && ui.originCb.checked), onProgress: setStatus,
         });
         if (!res) { setStatus("3DM export cancelled — pick a smaller area."); return; }
+      } else if (fmt === "svg") {
+        res = await buildSvgExport(viewport, groups, selection, { ...border, onProgress: setStatus });
       } else {
         res = await buildExportZip(viewport, groups, selection, border);
       }
       const { blob, empties, total } = res;
-      triggerDownload(blob, `weimar_export_${viewport}_${fmt === "3dm" ? "3dm_" : ""}${_downloadStamp()}.zip`);
-      const borderNote = selectionFromBaseBorder ? (fmt === "3dm" ? " + Base border layer" : " + base_border.geojson") : "";
+      triggerDownload(blob, `weimar_export_${viewport}_${fmt === "geojson" ? "" : fmt + "_"}${_downloadStamp()}.zip`);
+      const borderNote = selectionFromBaseBorder ? (fmt === "geojson" ? " + base_border.geojson" : " + Base border layer") : "";
       const extra = res.summary ? ` ${res.summary}` : "";
       setStatus(empties.length
         ? `Downloaded ${total} layer(s)${borderNote}.${extra} ⚠ No features in the selected area for: ${empties.join(", ")} (exported as empty).`
@@ -2177,6 +2581,8 @@ function createMapLibreBlock(mount, opts) {
   /** Show only features whose `prop` is in `values` (null = everything). */
   function setLayerFilter(ids, prop, values) {
     for (const id of ids) {
+      if (values === null) _categoryFilters.delete(`${viewport}:${id}`);
+      else _categoryFilters.set(`${viewport}:${id}`, { prop, values: values.slice() });
       const entry = managed.get(id);
       if (!entry) continue;
       entry.baseFilters = entry.baseFilters || new Map();
@@ -2349,7 +2755,7 @@ function createMapLibreBlock(mount, opts) {
       for (const layer of layersForViewport(viewport)) {
         if (layer.onTop && managed.has(layer.id)) managed.get(layer.id).layerIds.forEach((lid) => map.moveLayer(lid));
       }
-      for (const id of ["__export_rect_fill", "__export_rect_line", "__zone_fill", "__zone_line", "__zone_pts", "__base_border_line"]) {
+      for (const id of ["__export_rect_fill", "__export_rect_line", "__zone_fill", "__zone_line", "__zone_pts", "__base_border_line", "__base_border2_line", "__base_border_curve_line"]) {
         if (map.getLayer(id)) map.moveLayer(id);
       }
     } catch (err) { console.warn("[mask] city mask failed:", err); }
@@ -2430,6 +2836,23 @@ function createMapLibreBlock(mount, opts) {
       const src = map.getSource("__base_border");
       if (src) src.setData(_rectPolygon(rect));
     });
+    // Base border 2.0 and the curved border: blue / red so they read apart from the black one.
+    if (!map.getSource("__base_border2")) {
+      map.addSource("__base_border2", { type: "geojson", data: _emptyFC() });
+      map.addLayer({ id: "__base_border2_line", type: "line", source: "__base_border2",
+        paint: { "line-color": "#0F5FB5", "line-width": 2.5, "line-dasharray": [1.4, 1.1] } });
+      map.addSource("__base_border_curve", { type: "geojson", data: _emptyFC() });
+      map.addLayer({ id: "__base_border_curve_line", type: "line", source: "__base_border_curve",
+        paint: { "line-color": "#E3262A", "line-width": 2.5, "line-dasharray": [1.4, 1.1] } });
+    }
+    baseBorder2.subscribe((rect) => {
+      const src = map.getSource("__base_border2");
+      if (src) src.setData(_rectPolygon(rect));
+    });
+    baseBorderCurve.subscribe((ring) => {
+      const src = map.getSource("__base_border_curve");
+      if (src) src.setData(ring ? _rectPolygon({ polygon: ring }) : _emptyFC());
+    });
   }
 
   // Test hook — lets headless checks reach the map for a given viewport.
@@ -2464,14 +2887,34 @@ async function boot() {
 // hidden afterwards.
 // ---------------------------------------------------------------------------
 const SECTIONS = [
-  { id: "computational", title: "Computational Design", subtitle: "Precise geometry for Rhino / Grasshopper", startView: "base" },
-  { id: "weimar_model", title: "Street Section Analysis", subtitle: "Buildings with roofs", startView: "church",
+  { id: "combined", title: "Urban Morphology", subtitle: "Buildings, parcels, mobility, districts" },
+  { id: "computational", title: "Simplified Model for Analysis", subtitle: "Precise geometry for Rhino / Grasshopper", startView: "base" },
+  { id: "weimar_model", title: "Detailled Buildings (LOD2)", subtitle: "Buildings with roofs", startView: "church",
     exportMode: "zone", noBaseBorder: true, blank: true, noPopups: true },
-  { id: "combined", title: "Combined Analysis", subtitle: "Layers to be defined" },
-  { id: "blue_green", title: "Blue and Green City Core", subtitle: "Water, geology, terrain, protected areas" },
+  { id: "blue_green", title: "Natural Elements", subtitle: "Water, geology, terrain, protected areas" },
 ];
 
+/** Landing intro: the main open-data sources, name = link (one per distinct portal URL). */
+function renderLandingSources() {
+  const ul = document.getElementById("landing-sources");
+  if (!ul) return;
+  const order = ["geoproxy_th", "wega3d", "stadt_weimar", "umweltportal_th", "atkis_verkehr_th", "openstreetmap"];
+  const byId = new Map((manifest.resources || []).map((r) => [r.id, r]));
+  const seen = new Set();
+  for (const id of order) {
+    const r = byId.get(id);
+    if (!r || !r.url || seen.has(r.url)) continue;
+    seen.add(r.url);
+    const li = h("li");
+    const a = h("a", null, { href: r.url, target: "_blank", rel: "noopener" });
+    a.textContent = r.name;
+    li.append(a);
+    ul.append(li);
+  }
+}
+
 function initLanding(mount) {
+  renderLandingSources();
   const menu = document.getElementById("menu");
   const stage = document.getElementById("stage");
   const built = new Set();

@@ -56,9 +56,7 @@
       11.40122,
       51.03776
     ],
-    "viewports": [
-      "blue_green"
-    ],
+    "viewports": ["combined", "computational", "blue_green"],
     "attribution": "© GDI-Th (TLVermGeo), Datenlizenz Deutschland – Namensnennung 2.0",
     "note": "Real elevation as a MapLibre raster-dem source — Terrarium-encoded PNG tiles built from the Thuringia DGM1 (1 m airborne-laserscanning DTM, vintage 2014-2019) by tools/build_dgm_terrain.py. Static tiles under web/terrain/weimar-dgm/. Canonical DEM for Grasshopper: data/processed/dgm_weimar/weimar_dgm_25832.tif. TASK 10 — Blue-green Infrastructure; re-added to Weimar Model in TASK 15 (that viewport is MapLibre again, so it uses this raster-dem terrain like Blue-green, not the WEGA quantized-mesh one). Covers 145 of 178 AOI tiles (eastern strip not yet downloaded)."
   },
@@ -146,12 +144,6 @@
             "name": "Administrative boundary",
             "layers": [
               "weimar_admin_boundary"
-            ]
-          },
-          {
-            "name": "Ortsteile & Stadtteile",
-            "layers": [
-              "weimar_ortsteile"
             ]
           }
         ]
@@ -257,6 +249,12 @@
             "name": "Administrative boundary",
             "layers": [
               "weimar_admin_boundary"
+            ]
+          },
+          {
+            "name": "Ortsteile & Stadtteile",
+            "layers": [
+              "weimar_ortsteile"
             ]
           }
         ]
@@ -380,13 +378,7 @@
       {
         "name": "Parking",
         "items": [
-          {
-            "name": "Bicycle parking",
-            "layers": [
-              "osm_bike_parking"
-            ]
-          },
-          {
+{
             "name": "Car parking — points",
             "layers": [
               "osm_parking_points"
@@ -406,25 +398,7 @@
           }
         ]
       },
-      {
-        "name": "Cycling",
-        "items": [
-          {
-            "name": "Bike paths",
-            "layers": [
-              "osm_cycleways"
-            ]
-          },
-          {
-            "name": "Bike infrastructure",
-            "layers": [
-              "osm_bike_lanes",
-              "osm_bike_services"
-            ]
-          }
-        ]
-      },
-      {
+{
         "name": "Fuel & charging",
         "items": [
           {
@@ -682,9 +656,7 @@
       },
       "attribution": "© GDI-Th / Stadt Weimar, Datenlizenz Deutschland – Namensnennung 2.0",
       "sourceDoc": "DATA_LOG.md#task-08--reorganize-sections",
-      "viewports": [
-        "computational"
-      ]
+      "viewports": ["combined"]
     },
     {
       "id": "weimar_parcels",
@@ -1907,9 +1879,7 @@
       },
       "attribution": "© OpenStreetMap contributors (ODbL)",
       "sourceDoc": "tools/fetch_weimar_osm_extras.py",
-      "viewports": [
-        "combined"
-      ],
+      "viewports": [],
       "legendKind": "dot",
       "visible": false,
       "opacity": 1
@@ -1991,9 +1961,7 @@
       },
       "attribution": "© OpenStreetMap contributors (ODbL)",
       "sourceDoc": "tools/fetch_weimar_osm_extras.py",
-      "viewports": [
-        "combined"
-      ],
+      "viewports": [],
       "visible": false,
       "opacity": 1
     },
@@ -2010,9 +1978,7 @@
       },
       "attribution": "© OpenStreetMap contributors (ODbL)",
       "sourceDoc": "tools/fetch_weimar_osm_extras.py",
-      "viewports": [
-        "combined"
-      ],
+      "viewports": [],
       "visible": false,
       "opacity": 1,
       "subName": "Lanes & tracks on roads"
@@ -2029,9 +1995,7 @@
       },
       "attribution": "© OpenStreetMap contributors (ODbL)",
       "sourceDoc": "tools/fetch_weimar_osm_extras.py",
-      "viewports": [
-        "combined"
-      ],
+      "viewports": [],
       "legendKind": "dot",
       "visible": false,
       "opacity": 1,

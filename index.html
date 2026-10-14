@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Weimar — Collection of layers for analysis</title>
+  <title>City Data Explorer — Weimar</title>
 
   <!-- MapLibre GL JS via CDN — the single map engine for all map sections.
        No bundler, no npm. -->
@@ -28,12 +28,14 @@
   <header class="landing">
     <div class="landing-text">
       <h1 class="landing-inst">
-        <strong>Bauhaus University Weimar</strong>
-        <span>Informatik in der Architektur und Urbanistik</span>
-      </h1>
+        <strong>Bauhaus University Weimar</strong>      </h1>
       <div>
-        <p class="landing-title">Weimar</p>
-        <p class="landing-sub">Collection of layers for analysis</p>
+        <p class="landing-title"><span class="landing-title-top">City Data Explorer</span>Weimar</p>
+      </div>
+      <!-- Sources: bottom of the list aligned with the last menu entry. -->
+      <div class="landing-sources-block">
+        <p class="landing-sub">This page combines data from different open-data sources:</p>
+        <ul class="landing-sources" id="landing-sources"></ul>
       </div>
     </div>
     <nav class="landing-menu" aria-label="Maps">
@@ -46,6 +48,19 @@
   <main id="stage" hidden></main>
   <div id="blocks" hidden><p id="boot-msg">Loading…</p></div>
 
+  <script>
+    // Align the bottom of the landing text with the rule under "Select a map":
+    // reserve space equal to the height of the menu list.
+    (function () {
+      var list = document.getElementById("menu");
+      var text = document.querySelector(".landing-text");
+      if (!list || !text) return;
+      function sync() { text.style.setProperty("--menu-list-h", list.offsetHeight + "px"); }
+      sync();
+      if (window.ResizeObserver) new ResizeObserver(sync).observe(list);
+      window.addEventListener("resize", sync);
+    })();
+  </script>
   <script src="detailed.js"></script>
   <script src="app.js"></script>
 </body>
