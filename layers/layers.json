@@ -290,6 +290,12 @@
             "layers": [
               "weimar_buildings_extrude"
             ]
+          },
+          {
+            "name": "Buildings 3D - Heights without roofs",
+            "layers": [
+              "weimar_buildings_eave_height"
+            ]
           }
         ]
       },
@@ -899,7 +905,8 @@
       "attribution": "© GDI-Th, Datenlizenz Deutschland – Namensnennung 2.0",
       "sourceDoc": "DATA.md#14-3d-building-models-lod1--lod2-citygml",
       "viewports": [
-        "computational"
+        "computational",
+        "combined"
       ]
     },
     {
