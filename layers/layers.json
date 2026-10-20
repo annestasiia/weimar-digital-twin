@@ -168,6 +168,17 @@
         ]
       },
       {
+        "name": "Buildings",
+        "items": [
+          {
+            "name": "Buildings 3D - Heights without roofs",
+            "layers": [
+              "weimar_buildings_eave_height"
+            ]
+          }
+        ]
+      },
+      {
         "name": "Building use",
         "items": [
           {
@@ -863,6 +874,32 @@
       "sourceDoc": "DATA.md#14-3d-building-models-lod1--lod2-citygml",
       "viewports": [
         "combined"
+      ]
+    },
+    {
+      "id": "weimar_buildings_eave_height",
+      "rhinoLayer": "Buildings 3D - Heights without roofs",
+      "name": "Buildings 3D - Heights without roofs",
+      "description": "Building boxes extruded to the eave (wall top), without the roof volume. Per Building/BuildingPart from the CityGML LoD2 roof surfaces (tools/build_buildings_eave_height.py): area-weighted mean of the lowest edge of each pitched roof surface / the height of each flat one, relative to the lowest ground vertex. Flat roofs keep their full height. Attributes: eaveHeight (= height), ridgeHeight, roofType, heightWithAttic / atticFloorLikely (ALKIS floors that do not fit under the eave), usage, floors. Off by default.",
+      "resourceId": "geoproxy_th",
+      "type": "geojson",
+      "renderAs": "extrude",
+      "url": "layers/data/weimar_buildings_eave_height.geojson",
+      "visible": false,
+      "opacity": 1,
+      "style": {
+        "fill": "#E9E4D8",
+        "opacity": 0.92
+      },
+      "extrusion": {
+        "heightProperty": "eaveHeight",
+        "base": 0,
+        "fallbackHeight": 3
+      },
+      "attribution": "© GDI-Th, Datenlizenz Deutschland – Namensnennung 2.0",
+      "sourceDoc": "DATA.md#14-3d-building-models-lod1--lod2-citygml",
+      "viewports": [
+        "computational"
       ]
     },
     {

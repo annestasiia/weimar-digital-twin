@@ -182,6 +182,14 @@ function showBuildingPopup(map, e, f) {
     return;
   }
   base.buildingId = p.buildingId; base.height = p.height;
+  // "Heights without roofs" layer: height = eave; ridge, roof type and the attic-floor estimate next to it
+  if (p.eaveHeight != null && p.eaveHeight !== "") {
+    delete base.height;
+    base["height without roof (m)"] = p.eaveHeight;
+    if (p.ridgeHeight != null) base["ridge height (m)"] = p.ridgeHeight;
+    if (p.roofType) base["roof type"] = p.roofType;
+    if (String(p.atticFloorLikely) === "true") base["height incl. attic floor (m)"] = p.heightWithAttic;
+  }
   // TASK 28: usage / floors are baked into the GeoJSON (ALKIS WFS). The live
   // GetFeatureInfo below is only a fallback for buildings that have no baked value.
   if (f.properties.usage) base.usage = f.properties.usage;
@@ -1482,7 +1490,7 @@ async function build3dmExport(viewport, groups, selection, opts = {}) {
     const st = { name: lay.name, features: mergedFeatures.length, objects: 0, flatNoHeight: 0, skipped: 0, skippedIds: [], types: {},
       children: isU ? Object.fromEntries(useCats.map((c) => [c.name, 0])) : undefined,
       kind: isU ? (isF ? "footprints_by_use" : isP ? "parcels_by_use" : "buildings_by_use") : isS ? "spacesyntax" : isF ? "footprints" : isB ? "buildings" : isP ? "parcels" : "generic" };
-    const keys = isS ? ["ssId", "network", "length", "srcClass"] : isF ? ["usage", "useCategory", "height", "floors", "buildingId", "area", "areaSource"] : isB ? ["usage", "useCategory", "height", "floors", "buildingId"] : isP ? ["usage", "useCategory", "area", "areaSource"] : null;
+    const keys = isS ? ["ssId", "network", "length", "srcClass"] : isF ? ["usage", "useCategory", "height", "floors", "buildingId", "area", "areaSource"] : isB ? ["usage", "useCategory", "height", "floors", "buildingId", "eaveHeight", "ridgeHeight", "roofType", "heightWithAttic", "atticFloorLikely"] : isP ? ["usage", "useCategory", "area", "areaSource"] : null;
 
     const attrFor = (f, name) => {
       const a = new rhino.ObjectAttributes();
