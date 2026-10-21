@@ -56,7 +56,11 @@
       11.40122,
       51.03776
     ],
-    "viewports": ["combined", "computational", "blue_green"],
+    "viewports": [
+      "combined",
+      "computational",
+      "blue_green"
+    ],
     "attribution": "© GDI-Th (TLVermGeo), Datenlizenz Deutschland – Namensnennung 2.0",
     "note": "Real elevation as a MapLibre raster-dem source — Terrarium-encoded PNG tiles built from the Thuringia DGM1 (1 m airborne-laserscanning DTM, vintage 2014-2019) by tools/build_dgm_terrain.py. Static tiles under web/terrain/weimar-dgm/. Canonical DEM for Grasshopper: data/processed/dgm_weimar/weimar_dgm_25832.tif. TASK 10 — Blue-green Infrastructure; re-added to Weimar Model in TASK 15 (that viewport is MapLibre again, so it uses this raster-dem terrain like Blue-green, not the WEGA quantized-mesh one). Covers 145 of 178 AOI tiles (eastern strip not yet downloaded)."
   },
@@ -170,6 +174,12 @@
       {
         "name": "Buildings",
         "items": [
+          {
+            "name": "Building footprints",
+            "layers": [
+              "weimar_building_footprints"
+            ]
+          },
           {
             "name": "Buildings 3D - Heights without roofs",
             "layers": [
@@ -395,7 +405,7 @@
       {
         "name": "Parking",
         "items": [
-{
+          {
             "name": "Car parking — points",
             "layers": [
               "osm_parking_points"
@@ -415,7 +425,7 @@
           }
         ]
       },
-{
+      {
         "name": "Fuel & charging",
         "items": [
           {
@@ -673,7 +683,9 @@
       },
       "attribution": "© GDI-Th / Stadt Weimar, Datenlizenz Deutschland – Namensnennung 2.0",
       "sourceDoc": "DATA_LOG.md#task-08--reorganize-sections",
-      "viewports": ["combined"]
+      "viewports": [
+        "combined"
+      ]
     },
     {
       "id": "weimar_parcels",
@@ -854,7 +866,8 @@
       "attribution": "© GDI-Th, Datenlizenz Deutschland – Namensnennung 2.0",
       "sourceDoc": "DATA.md#14-3d-building-models-lod1--lod2-citygml",
       "viewports": [
-        "combined"
+        "combined",
+        "computational"
       ]
     },
     {
