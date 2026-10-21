@@ -506,7 +506,7 @@ function buildBlockChrome(mount, { title, subtitle, hostClass, withExport, expor
     }
     const originLabel = h("label", "export-origin", { hidden: true,
       title: "Shift all coordinates to a local origin (centre of the area, rounded to 1 km). The offset is written to manifest.json and the document User Text (originEasting / originNorthing). Off = absolute EPSG:25832, same as the terrain / OBJ files." });
-    originCb = h("input", null, { type: "checkbox" });
+    originCb = h("input", null, { type: "checkbox", checked: true });
     const originTxt = h("span"); originTxt.textContent = " local origin (small coordinates)";
     originLabel.append(originCb, originTxt);
     formatRow.append(formatSel, originLabel);
