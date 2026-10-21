@@ -1179,9 +1179,14 @@ async function buildExportZip(viewport, groups, selection, opts = {}) {
 
 const RHINO3DM_URL = "https://unpkg.com/rhino3dm@8.4.0/rhino3dm.module.min.js";
 const EXPORT_3DM_WARN_OBJECTS = 15000;
+// rhino3dm.js 8.4.0 File3dm.toByteArray() silently returns a truncated buffer (Rhino: "damaged geometry
+// table") or aborts once a document passes ~150 MB (works at 141 MB, broken at ~200 MB — tested in Node).
+// Bigger exports are split into several .3dm files of at most this estimated size each.
+const EXPORT_3DM_PART_BYTES = 100 * 1048576;
 // Measured in TASK 29 (headless Edge, default Base border): file bytes and build ms per object.
 const EXPORT_3DM_EST = {
-  building: { bytes: 3800, ms: 1.5 }, parcel: { bytes: 4900, ms: 1.5 }, footprint: { bytes: 3100, ms: 1.5 },
+  // bytes measured on a real 76 734-object export (Extrusion ≈ 1.6 KB, planar Brep: parcel ≈ 9 KB, footprint ≈ 5.6 KB)
+  building: { bytes: 1700, ms: 1.5 }, parcel: { bytes: 9000, ms: 1.5 }, footprint: { bytes: 5600, ms: 1.5 },
   line: { bytes: 800, ms: 0.5 }, point: { bytes: 300, ms: 0.5 },
 };
 let _rhinoPromise = null;
@@ -1442,52 +1447,90 @@ async function build3dmExport(viewport, groups, selection, opts = {}) {
   const ox = useOrigin ? Math.round((sw[0] + ne[0]) / 2 / 1000) * 1000 : 0;
   const oy = useOrigin ? Math.round((sw[1] + ne[1]) / 2 / 1000) * 1000 : 0;
 
-  // 3. Rhino document
-  const doc = new rhino.File3dm();
-  doc.settings().modelUnitSystem = rhino.UnitSystem.Meters;
+  // 3. Rhino document(s) — split into parts of <= EXPORT_3DM_PART_BYTES (estimate), see above
   const generated = new Date().toISOString();
-  try {
-    doc.strings().set("source", "Data Twin City Weimar");
-    doc.strings().set("crs", "EPSG:25832");
-    doc.strings().set("originEasting", String(ox));
-    doc.strings().set("originNorthing", String(oy));
-  } catch (e) { console.warn("[3dm] document strings not written:", e.message); }
+  const parts = [];          // { est, objects, layers: Set<Rhino layer name>, bytes, file }
+  let doc = null, part = null;
+  const newDoc = () => {
+    doc = new rhino.File3dm();
+    doc.settings().modelUnitSystem = rhino.UnitSystem.Meters;
+    try {
+      doc.strings().set("source", "Data Twin City Weimar");
+      doc.strings().set("crs", "EPSG:25832");
+      doc.strings().set("originEasting", String(ox));
+      doc.strings().set("originNorthing", String(oy));
+    } catch (e) { console.warn("[3dm] document strings not written:", e.message); }
+    part = { est: 0, objects: 0, layers: new Set(), bytes: null };
+  };
+  const finishDoc = async () => {
+    progress(`3DM: writing file${parts.length ? ` (part ${parts.length + 1})` : ""}…`);
+    await _tick();
+    const bytes = doc.toByteArray();
+    const count = doc.objects().count;
+    if (doc.delete) doc.delete();
+    doc = null;
+    // read back: a truncated buffer comes back as null / with fewer objects
+    const check = rhino.File3dm.fromByteArray(bytes);
+    const ok = !!check && check.objects().count === count;
+    if (check && check.delete) check.delete();
+    if (!ok) throw new Error(`rhino3dm wrote a damaged .3dm (part ${parts.length + 1}, ${(bytes.length / 1048576).toFixed(0)} MB) — pick a smaller area or fewer layers`);
+    part.bytes = bytes;
+    parts.push(part);
+  };
+  newDoc();
 
   const usedNames = new Set();
   const layerStats = [];
   let built = 0;
-  const addLayer = (name) => {
+  const uniqueName = (name) => {
     let nm = name || "layer", i = 2;
     while (usedNames.has(nm)) nm = `${name} (${i++})`;
     usedNames.add(nm);
+    return nm;
+  };
+  const addLayer = (nm) => {
     const l = new rhino.Layer(); l.name = nm;
+    part.layers.add(nm);
     return { idx: doc.layers().add(l), name: nm };
   };
 
-  for (const { group, mergedFeatures, layerMetas } of collected) {
+  for (let gi = 0; gi < collected.length; gi++) {
+    const { group, mergedFeatures, layerMetas } = collected[gi];
+    // whole group into a fresh part when it does not fit into the current one but fits into an empty one
+    const groupEst = breakdown[gi].bytes;
+    if (part.objects > 0 && part.est + groupEst > EXPORT_3DM_PART_BYTES && groupEst <= EXPORT_3DM_PART_BYTES) {
+      await finishDoc(); newDoc();
+    }
+    const objEst = breakdown[gi].objects ? groupEst / breakdown[gi].objects : 0;
     const ssMeta = layerMetas.find((m) => _isSsLayer(m.layer));
     const isS = !!ssMeta;                                              // TASK 31: Space Syntax networks
     const useMeta = layerMetas.find((m) => _isUseLayer(m.layer));
     const isU = !!useMeta;                                             // TASK 39: split by useCategory
-    const lay = addLayer(isS ? (ssMeta.layer.rhinoLayer || group.name) : isU ? useMeta.layer.rhinoLayer : group.name);
+    const layName = uniqueName(isS ? (ssMeta.layer.rhinoLayer || group.name) : isU ? useMeta.layer.rhinoLayer : group.name);
     const isF = layerMetas.some((m) => _isFootprintLayer(m.layer));   // TASK 30: flat, z=0, named by buildingId
     const isB = !isF && layerMetas.some((m) => _isBuildingLayer(m.layer));
     const isP = layerMetas.some((m) => _isParcelLayer(m.layer));
     // Parent layer + one child per category (always all of them, so the Layers panel looks the same for any
     // selection; empty categories stay empty). Child names are not in usedNames: Rhino only needs them unique per parent.
     const useCats = manifest[(useMeta && useMeta.layer.colorBy.palette) || "useCategories"] || [];
-    const childIdx = new Map();
-    if (isU) {
-      const parentId = doc.layers().get(lay.idx).id;
-      for (const c of useCats) {
-        const l = new rhino.Layer(); l.name = c.name; l.parentLayerId = parentId;
-        const m = /^#?([0-9a-f]{6})$/i.exec(c.color || "");
-        if (m) l.color = { r: parseInt(m[1].slice(0, 2), 16), g: parseInt(m[1].slice(2, 4), 16), b: parseInt(m[1].slice(4, 6), 16), a: 255 };
-        childIdx.set(c.name, doc.layers().add(l));
+    // (re)created in every part this group spills into, with the same names
+    let lay, childIdx, curLayerIdx;
+    const setupLayers = () => {
+      lay = addLayer(layName);
+      childIdx = new Map();
+      if (isU) {
+        const parentId = doc.layers().get(lay.idx).id;
+        for (const c of useCats) {
+          const l = new rhino.Layer(); l.name = c.name; l.parentLayerId = parentId;
+          const m = /^#?([0-9a-f]{6})$/i.exec(c.color || "");
+          if (m) l.color = { r: parseInt(m[1].slice(0, 2), 16), g: parseInt(m[1].slice(2, 4), 16), b: parseInt(m[1].slice(4, 6), 16), a: 255 };
+          childIdx.set(c.name, doc.layers().add(l));
+        }
       }
-    }
-    let curLayerIdx = lay.idx;
-    const st = { name: lay.name, features: mergedFeatures.length, objects: 0, flatNoHeight: 0, skipped: 0, skippedIds: [], types: {},
+      curLayerIdx = lay.idx;
+    };
+    setupLayers();
+    const st = { name: layName, features: mergedFeatures.length, objects: 0, flatNoHeight: 0, skipped: 0, skippedIds: [], types: {},
       children: isU ? Object.fromEntries(useCats.map((c) => [c.name, 0])) : undefined,
       kind: isU ? (isF ? "footprints_by_use" : isP ? "parcels_by_use" : "buildings_by_use") : isS ? "spacesyntax" : isF ? "footprints" : isB ? "buildings" : isP ? "parcels" : "generic" };
     const keys = isS ? ["ssId", "network", "length", "srcClass"] : isF ? ["usage", "useCategory", "height", "floors", "buildingId", "area", "areaSource"] : isB ? ["usage", "useCategory", "height", "floors", "buildingId", "eaveHeight", "ridgeHeight", "roofType", "heightWithAttic", "atticFloorLikely"] : isP ? ["usage", "useCategory", "area", "areaSource"] : null;
@@ -1508,6 +1551,10 @@ async function build3dmExport(viewport, groups, selection, opts = {}) {
     for (let i = 0; i < mergedFeatures.length; i++) {
       const f = mergedFeatures[i];
       const g = f.geometry;
+      if (part.objects > 0 && part.est + objEst * _objectCount(g) > EXPORT_3DM_PART_BYTES) {
+        await finishDoc(); newDoc(); setupLayers();
+      }
+      const before = st.objects;
       try {
         const nm = nameOf(f);
         let cat = null;
@@ -1554,6 +1601,8 @@ async function build3dmExport(viewport, groups, selection, opts = {}) {
       } catch (err) {
         console.warn("[3dm] feature skipped:", err.message); st.skipped++;
       }
+      part.objects += st.objects - before;
+      part.est += objEst * (st.objects - before);
       if (++built % 250 === 0) {
         progress(`3DM: building objects… ${built.toLocaleString()} / ${totalFeatures.toLocaleString()}`);
         await _tick();
@@ -1564,7 +1613,7 @@ async function build3dmExport(viewport, groups, selection, opts = {}) {
 
   // Base border as its own layer (closed polyline) when it is the export area
   if (opts.includeBaseBorder) {
-    const lay = addLayer("Base border");
+    const lay = addLayer(uniqueName("Base border"));
     const a = new rhino.ObjectAttributes(); a.layerIndex = lay.idx; a.name = "Base border";
     const ring = _selectionRing(selection);
     const pl = new rhino.Polyline(ring.length + 1);
@@ -1572,21 +1621,26 @@ async function build3dmExport(viewport, groups, selection, opts = {}) {
       const [x, y] = _toUtm32(lng, lat); pl.add(x - ox, y - oy, 0);
     }
     doc.objects().addCurve(pl.toPolylineCurve(), a);
+    part.objects++;
     layerStats.push({ name: lay.name, kind: "base_border", features: 1, objects: 1, flatNoHeight: 0, skipped: 0, skippedIds: [], types: { curve: 1 } });
   }
 
-  progress("3DM: writing file…");
-  await _tick();
-  const bytes = doc.toByteArray();
-  if (doc.delete) doc.delete();
+  await finishDoc();
 
-  // 4. zip: .3dm + manifest + attribution
+  // 4. zip: .3dm file(s) + manifest + attribution
   const zip = new JSZip();
   const fileName = `weimar_${viewport}.3dm`;
-  zip.file(fileName, bytes);
+  parts.forEach((p, i) => {
+    p.file = parts.length === 1 ? fileName : `weimar_${viewport}_part${i + 1}of${parts.length}.3dm`;
+    zip.file(p.file, p.bytes);
+  });
+  const totalBytes = parts.reduce((a, p) => a + p.bytes.length, 0);
   const objTotal = layerStats.reduce((a, s) => a + s.objects, 0);
   const manifestOut = {
-    generated, viewport, format: "3dm (rhino3dm.js 8.4.0)", file: fileName,
+    generated, viewport, format: "3dm (rhino3dm.js 8.4.0)", file: parts.length === 1 ? fileName : undefined,
+    files: parts.map((p) => ({ file: p.file, objectCount: p.objects, bytes: p.bytes.length, rhinoLayers: [...p.layers] })),
+    filesNote: parts.length === 1 ? undefined
+      : `Split into ${parts.length} files (rhino3dm.js cannot write one .3dm over ~150 MB). Open part 1, then File > Import the other parts — layers with the same name merge.`,
     crs: "EPSG:25832", units: "Meters",
     origin: { applied: useOrigin, originEasting: ox, originNorthing: oy, E: ox, N: oy,
       note: useOrigin ? "coordinates in the file = EPSG:25832 minus (E, N)" : "none — absolute EPSG:25832" },
@@ -1615,6 +1669,7 @@ async function build3dmExport(viewport, groups, selection, opts = {}) {
     "Data Twin City Weimar — 3DM export", `Generated: ${generated}`, `Viewport: ${viewport}`,
     `Selection (EPSG:4326): W ${selection.west}  S ${selection.south}  E ${selection.east}  N ${selection.north}`,
     "CRS: EPSG:25832 (ETRS89 / UTM 32N), units: metres",
+    ...(parts.length > 1 ? [`Files: ${parts.map((p) => p.file).join(", ")} — open part 1, then File > Import the others (same-named layers merge).`] : []),
     useOrigin ? `Local origin applied: add E ${ox}, N ${oy} to get EPSG:25832` : "Absolute EPSG:25832 coordinates (no origin shift)",
     "",
     "Base map shown for context is NOT part of this package:", "  © OpenStreetMap contributors (ODbL) · © CARTO", "",
@@ -1635,10 +1690,10 @@ async function build3dmExport(viewport, groups, selection, opts = {}) {
   const secs = ((performance.now() - t0) / 1000).toFixed(1);
   const empties = collected.filter((c) => c.mergedFeatures.length === 0).map((c) => c.group.fileId);
   const flatTotal = layerStats.reduce((a, s) => a + s.flatNoHeight, 0);
-  console.log(`[export] 3dm done — ${objTotal} objects, .3dm ${bytes.length} B, zip ${blob.size} B, ${secs}s`);
+  console.log(`[export] 3dm done — ${objTotal} objects, ${parts.length} .3dm file(s) ${totalBytes} B, zip ${blob.size} B, ${secs}s`);
   return {
-    blob, empties, total: groups.length, bytes, layerStats, manifestOut,
-    summary: `(${objTotal.toLocaleString()} objects, ${(bytes.length / 1048576).toFixed(1)} MB .3dm, ${secs} s${flatTotal ? `, ${flatTotal} buildings without height are flat` : ""})`,
+    blob, empties, total: groups.length, bytes: parts.length === 1 ? parts[0].bytes : parts.map((p) => p.bytes), layerStats, manifestOut,
+    summary: `(${objTotal.toLocaleString()} objects, ${(totalBytes / 1048576).toFixed(1)} MB .3dm${parts.length > 1 ? ` in ${parts.length} files — open part 1, File › Import the rest` : ""}, ${secs} s${flatTotal ? `, ${flatTotal} buildings without height are flat` : ""})`,
   };
 }
 
