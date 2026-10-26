@@ -225,6 +225,40 @@
             ]
           }
         ]
+      },
+      {
+        "name": "Space Syntax city-wide",
+        "items": [
+          {
+            "name": "Car network city-wide (Space Syntax)",
+            "layers": [
+              "weimar_ss_car_city"
+            ]
+          },
+          {
+            "name": "Pedestrian network city-wide (Space Syntax)",
+            "layers": [
+              "weimar_ss_pedestrian_city"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "SS city wide 2",
+        "items": [
+          {
+            "name": "Car network",
+            "layers": [
+              "weimar_ss_car_city2"
+            ]
+          },
+          {
+            "name": "Pedestrian network",
+            "layers": [
+              "weimar_ss_pedestrian_city2"
+            ]
+          }
+        ]
       }
     ],
     "weimar_model": [
@@ -1031,6 +1065,112 @@
       ],
       "attribution": "© GDI-Th, Datenlizenz Deutschland – Namensnennung 2.0 (derived network) + ODbL, © OpenStreetMap contributors",
       "sourceDoc": "DATA_LOG.md#task-34",
+      "viewports": [
+        "computational"
+      ]
+    },
+    {
+      "id": "weimar_ss_car_city2",
+      "rhinoLayer": "SS Car (city 2)",
+      "name": "Car network",
+      "description": "Trial layer: teacher's Rhino model (181018_Weimar LOD1 and Street network_EPSG25832.3dm, layer 'car'), geometry unchanged, translated to EPSG:25832 (tools/import_teacher_ss_model.py). Off by default.",
+      "resourceId": "atkis_verkehr_th",
+      "type": "geojson",
+      "url": "layers/data/weimar_ss_car_city2.geojson",
+      "visible": false,
+      "opacity": 1,
+      "style": {
+        "stroke": "#0F5FB5",
+        "strokeWidth": 1.6
+      },
+      "popupFields": [
+        "ssId",
+        "network",
+        "source",
+        "length"
+      ],
+      "attribution": "Teacher's Space Syntax model (Rhino)",
+      "sourceDoc": "DATA_LOG.md#ss-city-wide-2",
+      "viewports": [
+        "computational"
+      ]
+    },
+    {
+      "id": "weimar_ss_pedestrian_city2",
+      "rhinoLayer": "SS Pedestrian (city 2)",
+      "name": "Pedestrian network",
+      "description": "Trial layer: teacher's Rhino model (layer 'pedestrian'), geometry unchanged, translated to EPSG:25832 (tools/import_teacher_ss_model.py). Off by default.",
+      "resourceId": "atkis_verkehr_th",
+      "type": "geojson",
+      "url": "layers/data/weimar_ss_pedestrian_city2.geojson",
+      "visible": false,
+      "opacity": 1,
+      "style": {
+        "stroke": "#E5487F",
+        "strokeWidth": 1.6
+      },
+      "popupFields": [
+        "ssId",
+        "network",
+        "source",
+        "length"
+      ],
+      "attribution": "Teacher's Space Syntax model (Rhino)",
+      "sourceDoc": "DATA_LOG.md#ss-city-wide-2",
+      "viewports": [
+        "computational"
+      ]
+    },
+    {
+      "id": "weimar_ss_car_city",
+      "rhinoLayer": "SS Car (city)",
+      "name": "Car network city-wide (Space Syntax)",
+      "description": "Space Syntax car network for the whole city: inside the Base border her hand-drawn network (TASK_35, unchanged, source=manual), outside generated with the TASK_32/34 rules, preset strong (tools/build_space_syntax_city.py, source=auto), joined exactly at her edge ends. Off by default.",
+      "resourceId": "atkis_verkehr_th",
+      "type": "geojson",
+      "url": "layers/data/weimar_ss_car_city.geojson",
+      "visible": false,
+      "opacity": 1,
+      "style": {
+        "stroke": "#0F5FB5",
+        "strokeWidth": 1.6
+      },
+      "popupFields": [
+        "ssId",
+        "network",
+        "source",
+        "length",
+        "srcClass"
+      ],
+      "attribution": "© GDI-Th, Datenlizenz Deutschland – Namensnennung 2.0 (derived network)",
+      "sourceDoc": "DATA_LOG.md#space-syntax-city-wide",
+      "viewports": [
+        "computational"
+      ]
+    },
+    {
+      "id": "weimar_ss_pedestrian_city",
+      "rhinoLayer": "SS Pedestrian (city)",
+      "name": "Pedestrian network city-wide (Space Syntax)",
+      "description": "Space Syntax pedestrian network for the whole city: inside the Base border her hand-drawn network (TASK_35, unchanged, source=manual), outside generated with the TASK_32/34 rules, preset strong (tools/build_space_syntax_city.py, source=auto), joined exactly at her edge ends. Off by default.",
+      "resourceId": "atkis_verkehr_th",
+      "type": "geojson",
+      "url": "layers/data/weimar_ss_pedestrian_city.geojson",
+      "visible": false,
+      "opacity": 1,
+      "style": {
+        "stroke": "#E5487F",
+        "strokeWidth": 1.6
+      },
+      "popupFields": [
+        "ssId",
+        "network",
+        "source",
+        "length",
+        "srcClass"
+      ],
+      "attribution": "© GDI-Th, Datenlizenz Deutschland – Namensnennung 2.0 (derived network) + ODbL, © OpenStreetMap contributors",
+      "sourceDoc": "DATA_LOG.md#space-syntax-city-wide",
       "viewports": [
         "computational"
       ]

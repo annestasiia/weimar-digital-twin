@@ -1384,7 +1384,8 @@ function _objectCount(g) {
 // TASK 35: Space Syntax layers are her hand-drawn networks, clipped to Base border (city centre only) —
 // no export buffer any more (TASK_32's 2 km edge-effect buffer is gone; the export area for these groups
 // is just the Base border/selection rectangle, same as every other group).
-function _isSsLayer(layer) { return /^weimar_ss_(car|pedestrian)$/.test(layer.id); }   // TASK 31
+// City-wide variants (weimar_ss_*_city) export the same way: curves, z = 0, their own Rhino layer.
+function _isSsLayer(layer) { return /^weimar_ss_(car|pedestrian)(_city2?)?$/.test(layer.id); }   // TASK 31
 function _isFootprintLayer(layer) { return layer.id === "weimar_building_footprints" || layer.id === "weimar_building_use_footprints"; }
 // TASK 39: "Building use" layers — same geometry as footprints / 3D buildings, split by useCategory
 // into child Rhino layers under one parent layer (layer.rhinoLayer).
