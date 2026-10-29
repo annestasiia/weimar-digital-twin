@@ -227,7 +227,8 @@
           {
             "name": "Pedestrian network",
             "layers": [
-              "weimar_ss_pedestrian"
+              "weimar_ss_pedestrian",
+              "weimar_ss_park"
             ]
           }
         ]
@@ -646,7 +647,7 @@
         "name": "Pedestrian counting",
         "items": [
           {
-            "name": "Counting data 2016 / 2026",
+            "name": "Counting data 2016 / 2025 / 2026",
             "layers": [
               "weimar_pedestrian_counts"
             ]
@@ -659,13 +660,15 @@
           {
             "name": "Counting gates",
             "layers": [
-              "weimar_counting_gates"
+              "weimar_counting_gates",
+              "weimar_counting_gates_2025"
             ]
           },
           {
             "name": "Counting gates — labels",
             "layers": [
-              "weimar_counting_gates_labels"
+              "weimar_counting_gates_labels",
+              "weimar_counting_gates_2025_labels"
             ]
           }
         ]
@@ -682,7 +685,8 @@
           {
             "name": "Pedestrian network",
             "layers": [
-              "weimar_ss_pedestrian"
+              "weimar_ss_pedestrian",
+              "weimar_ss_park"
             ]
           }
         ]
@@ -1057,7 +1061,7 @@
       "id": "weimar_ss_car",
       "rhinoLayer": "SS Car",
       "name": "Car network",
-      "description": "Space Syntax car network — the teacher's final proposal (data/raw/teacher_ss_model/weimar_space_syntax_updated_2.3dm), the only Space Syntax variant of the platform. His geometry is unchanged; tools/import_ss_teacher_final.py only repairs junctions: ends < 0.5 m apart share one exact point, free ends on / near a line get a vertex there, at-grade crossings get a node. Network = Rhino layer. Review points: layers/data/ss_teacher_review.geojson.",
+      "description": "Space Syntax car network — the teacher's final proposal (data/raw/teacher_ss_model/Final routes/UDE_SpaceSyntax_update_3.3dm, Rhino layer 'Streets'), the only Space Syntax variant of the platform. His geometry is unchanged; tools/import_ss_teacher_final.py only repairs junctions: ends < 0.5 m apart share one exact point, free ends on / near a line get a vertex there, at-grade crossings get a node. Pedestrian only + Park Paths are one pedestrian graph. Review points: layers/data/ss_teacher_review.geojson.",
       "resourceId": "atkis_verkehr_th",
       "type": "geojson",
       "url": "layers/data/weimar_space_syntax_car.geojson",
@@ -1070,6 +1074,7 @@
       "popupFields": [
         "ssId",
         "network",
+        "pathType",
         "length",
         "teacherEdit"
       ],
@@ -1087,7 +1092,7 @@
       "id": "weimar_ss_pedestrian",
       "rhinoLayer": "SS Pedestrian",
       "name": "Pedestrian network",
-      "description": "Space Syntax pedestrian network — the teacher's final proposal (data/raw/teacher_ss_model/weimar_space_syntax_updated_2.3dm), the only Space Syntax variant of the platform. His geometry is unchanged; tools/import_ss_teacher_final.py only repairs junctions: ends < 0.5 m apart share one exact point, free ends on / near a line get a vertex there, at-grade crossings get a node. Network = Rhino layer. Review points: layers/data/ss_teacher_review.geojson.",
+      "description": "Space Syntax pedestrian network (pedestrian-only paths) — the teacher's final proposal (data/raw/teacher_ss_model/Final routes/UDE_SpaceSyntax_update_3.3dm, Rhino layer 'Pedestrian only'), the only Space Syntax variant of the platform. His geometry is unchanged; tools/import_ss_teacher_final.py only repairs junctions: ends < 0.5 m apart share one exact point, free ends on / near a line get a vertex there, at-grade crossings get a node. Pedestrian only + Park Paths are one pedestrian graph. Review points: layers/data/ss_teacher_review.geojson.",
       "resourceId": "atkis_verkehr_th",
       "type": "geojson",
       "url": "layers/data/weimar_space_syntax_pedestrian.geojson",
@@ -1100,6 +1105,7 @@
       "popupFields": [
         "ssId",
         "network",
+        "pathType",
         "length",
         "teacherEdit"
       ],
@@ -1111,7 +1117,40 @@
       ],
       "visibleViewports": [
         "computational"
-      ]
+      ],
+      "subName": "Pedestrian paths"
+    },
+    {
+      "id": "weimar_ss_park",
+      "rhinoLayer": "SS Park",
+      "name": "Park paths",
+      "description": "Space Syntax pedestrian network (park paths) — the teacher's final proposal (data/raw/teacher_ss_model/Final routes/UDE_SpaceSyntax_update_3.3dm, Rhino layer 'Park Paths'), the only Space Syntax variant of the platform. His geometry is unchanged; tools/import_ss_teacher_final.py only repairs junctions: ends < 0.5 m apart share one exact point, free ends on / near a line get a vertex there, at-grade crossings get a node. Pedestrian only + Park Paths are one pedestrian graph. Review points: layers/data/ss_teacher_review.geojson.",
+      "resourceId": "atkis_verkehr_th",
+      "type": "geojson",
+      "url": "layers/data/weimar_space_syntax_park.geojson",
+      "visible": false,
+      "opacity": 1,
+      "style": {
+        "stroke": "#2E9E5B",
+        "strokeWidth": 1.6
+      },
+      "popupFields": [
+        "ssId",
+        "network",
+        "pathType",
+        "length",
+        "teacherEdit"
+      ],
+      "attribution": "Teacher's Space Syntax model (Rhino), Bauhaus-Universität Weimar",
+      "sourceDoc": "DATA_LOG.md#space-syntax-teacher-final",
+      "viewports": [
+        "computational",
+        "space_syntax"
+      ],
+      "visibleViewports": [
+        "computational"
+      ],
+      "subName": "Park paths"
     },
     {
       "id": "weimar_ss_car_city2",
@@ -3061,7 +3100,8 @@
         "Max Pedestrian All",
         "Average Pedestrian All",
         "Average Weekdays  Pedestrian All"
-      ]
+      ],
+      "subName": "2016 gates (A1–U6)"
     },
     {
       "id": "weimar_counting_gates_labels",
@@ -3081,12 +3121,63 @@
         "labelField": "gate",
         "labelColor": "#c1121f"
       },
-      "interactive": false
+      "interactive": false,
+      "subName": "2016 gates (A1–U6)"
+    },
+    {
+      "id": "weimar_counting_gates_2025",
+      "name": "Counting gates — new in 2025",
+      "description": "25 counting points of the 2025 count (UDE_SpaceSyntax.3dm, layer 'Counting Points WS25') with no 2016 gate on the same street block, named V1–Z1 (tools/build_counting_register.py). The other 27 points of 2025 are 2016 gates and keep their names. Click a point for its card.",
+      "resourceId": "teacher_ss",
+      "type": "geojson",
+      "url": "layers/data/weimar_counting_gates_2025.geojson",
+      "visible": true,
+      "opacity": 1,
+      "attribution": "Counting points 2025: Bauhaus-Universität Weimar (WS 2025/26)",
+      "sourceDoc": "DATA_LOG.md#counting-gates-register-2016--2025",
+      "viewports": [
+        "space_syntax"
+      ],
+      "gateCard": true,
+      "style": {
+        "markerColor": "#0F5FB5",
+        "markerRadius": 2.33,
+        "markerStrokeWidth": 0.5
+      },
+      "popupFields": [
+        "gate",
+        "street",
+        "point2025",
+        "c25_ped_h",
+        "c25_veh_h"
+      ],
+      "subName": "New in 2025 (V1–Z1)"
+    },
+    {
+      "id": "weimar_counting_gates_2025_labels",
+      "name": "Counting gates — new in 2025, labels",
+      "description": "Names of the gates new in 2025 (V1 … Z1).",
+      "resourceId": "teacher_ss",
+      "type": "geojson",
+      "url": "layers/data/weimar_counting_gates_2025.geojson",
+      "visible": true,
+      "opacity": 1,
+      "attribution": "Counting points 2025: Bauhaus-Universität Weimar (WS 2025/26)",
+      "sourceDoc": "DATA_LOG.md#counting-gates-register-2016--2025",
+      "viewports": [
+        "space_syntax"
+      ],
+      "style": {
+        "labelField": "gate",
+        "labelColor": "#0F5FB5"
+      },
+      "interactive": false,
+      "subName": "New in 2025 (V1–Z1)"
     },
     {
       "id": "weimar_pedestrian_counts",
-      "name": "Counting data 2016 / 2026",
-      "description": "Pedestrian / cyclist counts at the 120 gates: 2016 (3 days x 3 time slots, 15 min each; gaps filled from the other working day) and 2026 (working day, 17:00) once it exists. Switches under the sidebar row pick year / day / time / count; numbers over the gates, heat along the Space Syntax network (150 m), click a gate for its card. Built by tools/build_pedestrian_counts.py.",
+      "name": "Counting data 2016 / 2025 / 2026",
+      "description": "Pedestrian / cyclist counts under common gate names: 2016 at the 120 gates (3 days x 3 time slots, 15 min each; gaps filled from the other working day), 2025 at 52 points (peak hour of a working day, pedestrians and vehicles PER HOUR; 27 are 2016 gates, 25 new V1–Z1) and 2026 (working day, 17:00) once it exists. Switches under the sidebar row pick year / day / time / count; numbers over the gates, heat along the Space Syntax network (150 m), click a gate for its card. Built by tools/build_counting_register.py + tools/build_pedestrian_counts.py.",
       "resourceId": "teacher_ss",
       "type": "counts",
       "url": "layers/data/weimar_pedestrian_counts.geojson",
@@ -3097,7 +3188,7 @@
       "style": {
         "markerColor": "#EE5A14"
       },
-      "attribution": "Pedestrian counting: Bauhaus-Universität Weimar, InfAR (Weimar 03-2016)",
+      "attribution": "Pedestrian counting: Bauhaus-Universität Weimar, InfAR (Weimar 03-2016; WS 2025/26)",
       "sourceDoc": "DATA_LOG.md#pedestrian-counting",
       "viewports": [
         "space_syntax"

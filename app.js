@@ -1405,7 +1405,7 @@ function _objectCount(g) {
 // no export buffer any more (TASK_32's 2 km edge-effect buffer is gone; the export area for these groups
 // is just the Base border/selection rectangle, same as every other group).
 // City-wide variants (weimar_ss_*_city) export the same way: curves, z = 0, their own Rhino layer.
-function _isSsLayer(layer) { return /^weimar_ss_(car|pedestrian)(_city2?)?$/.test(layer.id); }   // TASK 31
+function _isSsLayer(layer) { return /^weimar_ss_(car|pedestrian|park)(_city2?)?$/.test(layer.id); }   // TASK 31 (+ park paths)
 function _isFootprintLayer(layer) { return layer.id === "weimar_building_footprints" || layer.id === "weimar_building_use_footprints"; }
 // TASK 39: "Building use" layers — same geometry as footprints / 3D buildings, split by useCategory
 // into child Rhino layers under one parent layer (layer.rhinoLayer).
@@ -1554,7 +1554,7 @@ async function build3dmExport(viewport, groups, selection, opts = {}) {
     const st = { name: layName, features: mergedFeatures.length, objects: 0, flatNoHeight: 0, skipped: 0, skippedIds: [], types: {},
       children: isU ? Object.fromEntries(useCats.map((c) => [c.name, 0])) : undefined,
       kind: isU ? (isF ? "footprints_by_use" : isP ? "parcels_by_use" : "buildings_by_use") : isS ? "spacesyntax" : isF ? "footprints" : isB ? "buildings" : isP ? "parcels" : "generic" };
-    const keys = isS ? ["ssId", "network", "length", "srcClass"] : isF ? ["usage", "useCategory", "height", "floors", "buildingId", "area", "areaSource"] : isB ? ["usage", "useCategory", "height", "floors", "buildingId", "eaveHeight", "ridgeHeight", "roofType", "heightWithAttic", "atticFloorLikely"] : isP ? ["usage", "useCategory", "area", "areaSource"] : null;
+    const keys = isS ? ["ssId", "network", "pathType", "length", "srcClass"] : isF ? ["usage", "useCategory", "height", "floors", "buildingId", "area", "areaSource"] : isB ? ["usage", "useCategory", "height", "floors", "buildingId", "eaveHeight", "ridgeHeight", "roofType", "heightWithAttic", "atticFloorLikely"] : isP ? ["usage", "useCategory", "area", "areaSource"] : null;
 
     const attrFor = (f, name) => {
       const a = new rhino.ObjectAttributes();
