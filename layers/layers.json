@@ -34,6 +34,11 @@
       "id": "openstreetmap",
       "name": "OpenStreetMap",
       "url": "https://www.openstreetmap.org"
+    },
+    {
+      "id": "teacher_ss",
+      "name": "Counting gates (InfAR, Bauhaus-Universität Weimar)",
+      "url": "https://www.uni-weimar.de/"
     }
   ],
   "terrain": {
@@ -59,7 +64,8 @@
     "viewports": [
       "combined",
       "computational",
-      "blue_green"
+      "blue_green",
+      "space_syntax"
     ],
     "attribution": "© GDI-Th (TLVermGeo), Datenlizenz Deutschland – Namensnennung 2.0",
     "note": "Real elevation as a MapLibre raster-dem source — Terrarium-encoded PNG tiles built from the Thuringia DGM1 (1 m airborne-laserscanning DTM, vintage 2014-2019) by tools/build_dgm_terrain.py. Static tiles under web/terrain/weimar-dgm/. Canonical DEM for Grasshopper: data/processed/dgm_weimar/weimar_dgm_25832.tif. TASK 10 — Blue-green Infrastructure; re-added to Weimar Model in TASK 15 (that viewport is MapLibre again, so it uses this raster-dem terrain like Blue-green, not the WEGA quantized-mesh one). Covers 145 of 178 AOI tiles (eastern strip not yet downloaded)."
@@ -213,49 +219,15 @@
         "name": "Space Syntax",
         "items": [
           {
-            "name": "Car network (Space Syntax)",
+            "name": "Car network",
             "layers": [
               "weimar_ss_car"
             ]
           },
           {
-            "name": "Pedestrian network (Space Syntax)",
-            "layers": [
-              "weimar_ss_pedestrian"
-            ]
-          }
-        ]
-      },
-      {
-        "name": "Space Syntax city-wide",
-        "items": [
-          {
-            "name": "Car network city-wide (Space Syntax)",
-            "layers": [
-              "weimar_ss_car_city"
-            ]
-          },
-          {
-            "name": "Pedestrian network city-wide (Space Syntax)",
-            "layers": [
-              "weimar_ss_pedestrian_city"
-            ]
-          }
-        ]
-      },
-      {
-        "name": "SS city wide 2",
-        "items": [
-          {
-            "name": "Car network",
-            "layers": [
-              "weimar_ss_car_city2"
-            ]
-          },
-          {
             "name": "Pedestrian network",
             "layers": [
-              "weimar_ss_pedestrian_city2"
+              "weimar_ss_pedestrian"
             ]
           }
         ]
@@ -668,6 +640,64 @@
           }
         ]
       }
+    ],
+    "space_syntax": [
+      {
+        "name": "Pedestrian counting",
+        "items": [
+          {
+            "name": "Counting data 2016 / 2026",
+            "layers": [
+              "weimar_pedestrian_counts"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Counting gates",
+        "items": [
+          {
+            "name": "Counting gates",
+            "layers": [
+              "weimar_counting_gates"
+            ]
+          },
+          {
+            "name": "Counting gates — labels",
+            "layers": [
+              "weimar_counting_gates_labels"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Space Syntax",
+        "items": [
+          {
+            "name": "Car network",
+            "layers": [
+              "weimar_ss_car"
+            ]
+          },
+          {
+            "name": "Pedestrian network",
+            "layers": [
+              "weimar_ss_pedestrian"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Buildings",
+        "items": [
+          {
+            "name": "Building footprints",
+            "layers": [
+              "weimar_building_footprints"
+            ]
+          }
+        ]
+      }
     ]
   },
   "layers": [
@@ -773,7 +803,6 @@
         "legendTitle": "Parcel use"
       },
       "visibleViewports": [
-        "computational",
         "combined"
       ]
     },
@@ -901,7 +930,11 @@
       "sourceDoc": "DATA.md#14-3d-building-models-lod1--lod2-citygml",
       "viewports": [
         "combined",
-        "computational"
+        "computational",
+        "space_syntax"
+      ],
+      "visibleViewports": [
+        "space_syntax"
       ]
     },
     {
@@ -954,6 +987,9 @@
       "viewports": [
         "computational",
         "combined"
+      ],
+      "visibleViewports": [
+        "computational"
       ]
     },
     {
@@ -1020,11 +1056,11 @@
     {
       "id": "weimar_ss_car",
       "rhinoLayer": "SS Car",
-      "name": "Car network (Space Syntax)",
-      "description": "Space Syntax car network, drawn by hand in QGIS (TASK_35) — her drawing is the source of truth, nothing simplified/straightened/thinned. Topology-noded (ends snapped, real crossings split into graph nodes), joined to pedestrian at identical shared vertices, clipped to Base border (city centre only). Presets from TASK_31-34 stay on disk, unused. Off by default.",
+      "name": "Car network",
+      "description": "Space Syntax car network — the teacher's final proposal (data/raw/teacher_ss_model/weimar_space_syntax_updated_2.3dm), the only Space Syntax variant of the platform. His geometry is unchanged; tools/import_ss_teacher_final.py only repairs junctions: ends < 0.5 m apart share one exact point, free ends on / near a line get a vertex there, at-grade crossings get a node. Network = Rhino layer. Review points: layers/data/ss_teacher_review.geojson.",
       "resourceId": "atkis_verkehr_th",
       "type": "geojson",
-      "url": "layers/data/weimar_ss_car_final.geojson",
+      "url": "layers/data/weimar_space_syntax_car.geojson",
       "visible": false,
       "opacity": 1,
       "style": {
@@ -1035,22 +1071,26 @@
         "ssId",
         "network",
         "length",
-        "srcClass"
+        "teacherEdit"
       ],
-      "attribution": "© GDI-Th, Datenlizenz Deutschland – Namensnennung 2.0 (derived network)",
-      "sourceDoc": "DATA_LOG.md#task-34",
+      "attribution": "Teacher's Space Syntax model (Rhino), Bauhaus-Universität Weimar",
+      "sourceDoc": "DATA_LOG.md#space-syntax-teacher-final",
       "viewports": [
+        "computational",
+        "space_syntax"
+      ],
+      "visibleViewports": [
         "computational"
       ]
     },
     {
       "id": "weimar_ss_pedestrian",
       "rhinoLayer": "SS Pedestrian",
-      "name": "Pedestrian network (Space Syntax)",
-      "description": "Space Syntax pedestrian network, drawn by hand in QGIS (TASK_35) — her drawing is the source of truth, nothing simplified/straightened/thinned. Topology-noded, every end near car snapped exactly onto it (car gets the same vertex, never split unless SPLIT_CAR_AT_JUNCTIONS), clipped to Base border (city centre only). Presets from TASK_31-34 stay on disk, unused. Off by default.",
+      "name": "Pedestrian network",
+      "description": "Space Syntax pedestrian network — the teacher's final proposal (data/raw/teacher_ss_model/weimar_space_syntax_updated_2.3dm), the only Space Syntax variant of the platform. His geometry is unchanged; tools/import_ss_teacher_final.py only repairs junctions: ends < 0.5 m apart share one exact point, free ends on / near a line get a vertex there, at-grade crossings get a node. Network = Rhino layer. Review points: layers/data/ss_teacher_review.geojson.",
       "resourceId": "atkis_verkehr_th",
       "type": "geojson",
-      "url": "layers/data/weimar_ss_pedestrian_final.geojson",
+      "url": "layers/data/weimar_space_syntax_pedestrian.geojson",
       "visible": false,
       "opacity": 1,
       "style": {
@@ -1061,11 +1101,15 @@
         "ssId",
         "network",
         "length",
-        "srcClass"
+        "teacherEdit"
       ],
-      "attribution": "© GDI-Th, Datenlizenz Deutschland – Namensnennung 2.0 (derived network) + ODbL, © OpenStreetMap contributors",
-      "sourceDoc": "DATA_LOG.md#task-34",
+      "attribution": "Teacher's Space Syntax model (Rhino), Bauhaus-Universität Weimar",
+      "sourceDoc": "DATA_LOG.md#space-syntax-teacher-final",
       "viewports": [
+        "computational",
+        "space_syntax"
+      ],
+      "visibleViewports": [
         "computational"
       ]
     },
@@ -1091,9 +1135,7 @@
       ],
       "attribution": "Teacher's Space Syntax model (Rhino)",
       "sourceDoc": "DATA_LOG.md#ss-city-wide-2",
-      "viewports": [
-        "computational"
-      ]
+      "viewports": []
     },
     {
       "id": "weimar_ss_pedestrian_city2",
@@ -1117,9 +1159,7 @@
       ],
       "attribution": "Teacher's Space Syntax model (Rhino)",
       "sourceDoc": "DATA_LOG.md#ss-city-wide-2",
-      "viewports": [
-        "computational"
-      ]
+      "viewports": []
     },
     {
       "id": "weimar_ss_car_city",
@@ -1144,9 +1184,7 @@
       ],
       "attribution": "© GDI-Th, Datenlizenz Deutschland – Namensnennung 2.0 (derived network)",
       "sourceDoc": "DATA_LOG.md#space-syntax-city-wide",
-      "viewports": [
-        "computational"
-      ]
+      "viewports": []
     },
     {
       "id": "weimar_ss_pedestrian_city",
@@ -1171,9 +1209,7 @@
       ],
       "attribution": "© GDI-Th, Datenlizenz Deutschland – Namensnennung 2.0 (derived network) + ODbL, © OpenStreetMap contributors",
       "sourceDoc": "DATA_LOG.md#space-syntax-city-wide",
-      "viewports": [
-        "computational"
-      ]
+      "viewports": []
     },
     {
       "id": "weimar_ss_car_removed",
@@ -1196,9 +1232,7 @@
       ],
       "attribution": "© GDI-Th, Datenlizenz Deutschland – Namensnennung 2.0 (derived network)",
       "sourceDoc": "DATA_LOG.md#task-32",
-      "viewports": [
-        "computational"
-      ]
+      "viewports": []
     },
     {
       "id": "weimar_ss_pedestrian_removed",
@@ -1221,9 +1255,7 @@
       ],
       "attribution": "© GDI-Th, Datenlizenz Deutschland – Namensnennung 2.0 (derived network) + ODbL, © OpenStreetMap contributors",
       "sourceDoc": "DATA_LOG.md#task-34",
-      "viewports": [
-        "computational"
-      ]
+      "viewports": []
     },
     {
       "id": "dop_rgb_20cm",
@@ -3001,6 +3033,74 @@
       "sourceDoc": "DATA.md#tier-3",
       "viewports": [
         "blue_green"
+      ]
+    },
+    {
+      "id": "weimar_counting_gates",
+      "name": "Counting gates",
+      "description": "120 pedestrian / cyclist counting gates (A1–U6) from the teacher's counting table, placed by its X/Y translated into EPSG:25832 (tools/build_counting_gates.py). Click a point for the counts.",
+      "resourceId": "teacher_ss",
+      "type": "geojson",
+      "url": "layers/data/weimar_counting_gates.geojson",
+      "visible": true,
+      "opacity": 1,
+      "attribution": "Counting gates: Bauhaus-Universität Weimar, InfAR (Weimar 03-2016)",
+      "sourceDoc": "DATA_LOG.md#counting-gates",
+      "viewports": [
+        "space_syntax"
+      ],
+      "gateCard": true,
+      "style": {
+        "markerColor": "#c1121f",
+        "markerRadius": 2.33,
+        "markerStrokeWidth": 0.5
+      },
+      "popupFields": [
+        "gate",
+        "Min Pedestrian All",
+        "Max Pedestrian All",
+        "Average Pedestrian All",
+        "Average Weekdays  Pedestrian All"
+      ]
+    },
+    {
+      "id": "weimar_counting_gates_labels",
+      "name": "Counting gates — labels",
+      "description": "Gate names (A1 … U6) as text labels; switch on/off independently of the points.",
+      "resourceId": "teacher_ss",
+      "type": "geojson",
+      "url": "layers/data/weimar_counting_gates.geojson",
+      "visible": true,
+      "opacity": 1,
+      "attribution": "Counting gates: Bauhaus-Universität Weimar, InfAR (Weimar 03-2016)",
+      "sourceDoc": "DATA_LOG.md#counting-gates",
+      "viewports": [
+        "space_syntax"
+      ],
+      "style": {
+        "labelField": "gate",
+        "labelColor": "#c1121f"
+      },
+      "interactive": false
+    },
+    {
+      "id": "weimar_pedestrian_counts",
+      "name": "Counting data 2016 / 2026",
+      "description": "Pedestrian / cyclist counts at the 120 gates: 2016 (3 days x 3 time slots, 15 min each; gaps filled from the other working day) and 2026 (working day, 17:00) once it exists. Switches under the sidebar row pick year / day / time / count; numbers over the gates, heat along the Space Syntax network (150 m), click a gate for its card. Built by tools/build_pedestrian_counts.py.",
+      "resourceId": "teacher_ss",
+      "type": "counts",
+      "url": "layers/data/weimar_pedestrian_counts.geojson",
+      "heatUrl": "layers/data/weimar_pedestrian_counts_heat.geojson",
+      "visible": false,
+      "opacity": 1,
+      "legendKind": "dot",
+      "style": {
+        "markerColor": "#EE5A14"
+      },
+      "attribution": "Pedestrian counting: Bauhaus-Universität Weimar, InfAR (Weimar 03-2016)",
+      "sourceDoc": "DATA_LOG.md#pedestrian-counting",
+      "viewports": [
+        "space_syntax"
       ]
     }
   ],

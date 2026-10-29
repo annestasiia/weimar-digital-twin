@@ -445,7 +445,7 @@ function terrainDemAllowed(viewport) {
  * Builds the block <section> with map host, title, sidebar, view controls and
  * attribution strip, appends it to `mount`, and returns the useful refs.
  */
-function buildBlockChrome(mount, { title, subtitle, hostClass, withExport, exportMode }) {
+function buildBlockChrome(mount, { title, subtitle, hostClass, withExport, exportMode, materials }) {
   // Three-column layout: layers (left) | map (centre) | tools (right).
   const section = h("section", "map-block");
   const host = h("div", hostClass);
@@ -556,6 +556,24 @@ function buildBlockChrome(mount, { title, subtitle, hostClass, withExport, expor
   imgSec.append(imgLabel, imgRow, annotLabel, imgNote);
   if (exportMode !== "zone") toolsBody.append(imgSec);
 
+  // Downloadable field materials (e.g. Space Syntax counting sheets). `href` missing = shown but not available yet.
+  if (Array.isArray(materials) && materials.length) {
+    const matSec = h("div", "tools-section");
+    const matLabel = h("div", "tools-label"); matLabel.textContent = "Counting materials";
+    matSec.append(matLabel);
+    for (const m of materials) {
+      const a = m.href
+        ? h("a", "btn-material", { href: m.href, download: "", target: "_blank", rel: "noopener" })
+        : h("span", "btn-material is-soon", { title: "Coming soon" });
+      a.textContent = m.label + (m.href ? "" : " — soon");
+      matSec.append(a);
+    }
+    if (materials.some((m) => m.note)) {
+      const n = h("div", "tools-note"); n.textContent = materials.find((m) => m.note).note; matSec.append(n);
+    }
+    toolsBody.append(matSec);
+  }
+
   // ---- centre: map + overlays ----
   const viewControls = h("div", "view-controls");
   const viewSwitch = h("div", "view-switch");
@@ -582,7 +600,7 @@ function buildBlockChrome(mount, { title, subtitle, hostClass, withExport, expor
   mount.append(metaEl);
 
   return {
-    section, host, groupsEl, viewSwitch, btn2d, btn3d, terrainBtn, attributionEl, legendEl, metaEl,
+    section, host, groupsEl, toolsBody, viewSwitch, btn2d, btn3d, terrainBtn, attributionEl, legendEl, metaEl,
     exportToggleBtn, selectAreaBtn, selectPolyBtn, baseBorderBtn, baseBorder2Btn, baseBorderCurveBtn, exportRunBtn, exportBarEl,
     formatRow, formatSel, originCb, pngBtn, pdfBtn, gridBtn, gridNote, annotBtn, annotCheck,
     zoneBtn, zoneClearBtn, zoneExportBtn, zoneStatus, gridCanvas, gridScaleEl,
@@ -803,6 +821,8 @@ function renderSidebarItem(item, handlers, viewport) {
   main.append(eye);
   row.append(main);
   if (panel) row.append(panel);
+  const controls = handlers.itemControls && handlers.itemControls(item.layers || []);   // e.g. pedestrian-counting switches
+  if (controls) row.append(controls);
   if (handlers.decorateRow) handlers.decorateRow(row, item.layers || [], item.name, subRows);
   return row;
 }
@@ -1863,6 +1883,14 @@ async function buildSvgExport(viewport, groups, selection, opts = {}) {
  * Returns { decorateRow, refresh } — pass decorateRow into renderSidebar() so
  * each sidebar row gets its own export checkbox.
  */
+// Export borders (Base border / 2.0 / curve) are hidden until the export mode is switched on.
+const BORDER_OVERLAY_IDS = ["__base_border_line", "__base_border2_line", "__base_border_curve_line"];
+function _borderLayout(map) { return { visibility: map.__bordersOn ? "visible" : "none" }; }
+function setBorderOverlaysVisible(map, on) {
+  map.__bordersOn = !!on;
+  for (const id of BORDER_OVERLAY_IDS) if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
+}
+
 function createExportController({ map, viewport, ui }) {
   const rows = []; // { rowEl, exportableIds:[], checkbox, wrapper }
   let active = false;
@@ -2065,6 +2093,7 @@ function createExportController({ map, viewport, ui }) {
 
   function setActive(on) {
     active = on;
+    setBorderOverlaysVisible(map, on);
     for (const r of rows) {
       r.wrapper.hidden = !on;
       for (const sb of r.subs) sb.wrapper.hidden = !on;
@@ -2375,7 +2404,7 @@ function zoomForMinHeight(metres) {
 
 function createMapLibreBlock(mount, opts) {
   const { title, subtitle, viewport, basemap } = opts;
-  const ui = buildBlockChrome(mount, { title, subtitle, hostClass: "maplibre-host", withExport: true, exportMode: opts.exportMode });
+  const ui = buildBlockChrome(mount, { title, subtitle, hostClass: "maplibre-host", withExport: true, exportMode: opts.exportMode, materials: opts.materials });
   const baseAttribution = basemap?.attribution || BASE_ATTRIBUTION;
   // Either a full remote style URL (e.g. CARTO Positron's published vector
   // style — see its own comment above) or the plain OSM raster built inline.
@@ -2532,6 +2561,23 @@ function createMapLibreBlock(mount, opts) {
       layout: { visibility: vis, "line-join": "round", "line-cap": "round" },
     });
     const iconId = `${config.id}__icon`;
+    const labelId = `${config.id}__label`;
+    if (style.labelField) {
+      // text-only layer (e.g. counting-gate names): its own eye, independent of the point layer
+      map.addLayer({
+        id: labelId, type: "symbol", source: srcId, filter: withF(isPoint),
+        layout: {
+          visibility: vis, "text-field": ["to-string", ["get", style.labelField]],
+          "text-font": ["Montserrat SemiBold", "Open Sans Bold", "Noto Sans Regular"],
+          "text-size": 13, "text-offset": [0, -1.1], "text-anchor": "bottom",
+          "text-allow-overlap": true, "text-ignore-placement": true,
+        },
+        paint: { "text-color": style.labelColor || "#222", "text-halo-color": "#ffffff", "text-halo-width": 1.6, "text-opacity": op },
+      });
+      managed.set(config.id, { config, layerIds: [labelId],
+        setVisible: (v) => map.setLayoutProperty(labelId, "visibility", v ? "visible" : "none") });
+      return;
+    }
     if (config.markerIcon === "tree") {
       if (!map.hasImage("icon_tree")) map.addImage("icon_tree", makeTreeIcon(), { pixelRatio: 2 });
       map.addLayer({
@@ -2544,10 +2590,10 @@ function createMapLibreBlock(mount, opts) {
         id: circleId, type: "circle", source: srcId,
         filter: withF(isPoint),
         paint: {
-          "circle-radius": style.markerSize === "large" ? 7 : 5,
+          "circle-radius": style.markerRadius ?? (style.markerSize === "large" ? 7 : 5),
           "circle-color": point,
           "circle-stroke-color": "#0d0f13",
-          "circle-stroke-width": 1.5,
+          "circle-stroke-width": style.markerStrokeWidth ?? 1.5,
           "circle-opacity": op, "circle-stroke-opacity": op,
         },
         layout: { visibility: vis },
@@ -2564,6 +2610,7 @@ function createMapLibreBlock(mount, opts) {
         const f = e.features && e.features[0];
         if (!f) return;
         if (f.properties && f.properties.buildingId) return showBuildingPopup(map, e, f);
+        if (config.gateCard && map.__showGateCard) return map.__showGateCard(f.properties.gate);   // counting gate -> card on the right
         // optional manifest `popupFields` (TASK 31): show only these properties, in this order
         const props = Array.isArray(config.popupFields)
           ? Object.fromEntries(config.popupFields.map((k) => [k, f.properties[k]])) : f.properties;
@@ -2665,6 +2712,10 @@ function createMapLibreBlock(mount, opts) {
     map.fitBounds([[r.west, r.south], [r.east, r.north]], { padding: 40, duration });
   };
   if (opts.startView === "base") flyToBase(0);
+  else if (opts.startView === "centre") {
+    // city centre north of the Altstadt: Goetheplatz / Weimarhallenpark left, the Ilm right, railway at the top
+    map.jumpTo({ center: [11.3265, 50.9847], zoom: 14.75 });
+  }
   else if (opts.startView === "church") {
     // Herderkirche (Stadtkirche St. Peter und Paul), seen from the south-east (camera looks north-west)
     map.jumpTo({ center: [11.32955, 50.98121], zoom: 17.4, pitch: 62, bearing: -45 });
@@ -2839,6 +2890,12 @@ function createMapLibreBlock(mount, opts) {
         else if (layer.type === "geojson" && layer.renderAs === "extrude") addGeoJsonExtrusionLayer(layer);
         else if (layer.type === "geojson") addGeoJsonLayer(layer);
         else if (layer.type === "3dtiles") add3DTilesLayer(layer);
+        else if (layer.type === "counts") {
+          // pedestrian counting: numbers + heat + gate card (web/counts.js)
+          const c = createPedestrianCounts(map, layer, { visible: layerVisibleInViewport(layer, viewport), toolsBody: ui.toolsBody });
+          managed.set(layer.id, { config: layer, layerIds: c.layerIds, setVisible: c.setVisible, controls: c.controls });
+          map.__showGateCard = c.showCard;
+        }
         else console.warn(`[${viewport}] "${layer.id}" type "${layer.type}" not supported in a MapLibre block.`);
       } catch (err) {
         console.error(`[${viewport}] failed to add "${layer.id}":`, err);
@@ -2854,7 +2911,8 @@ function createMapLibreBlock(mount, opts) {
       catch (err) { console.error(`[${viewport}] DGM terrain wiring failed:`, err); }
     }
     const exporter = ui.exportToggleBtn ? createExportController({ map, viewport, ui }) : null;
-    renderSidebar(ui.groupsEl, viewport, { setLayerVisible, setLayerFilter, onEnable, decorateRow: exporter ? exporter.decorateRow : undefined });
+    const itemControls = (layerIds) => layerIds.map((id) => managed.get(id)).find((m) => m && m.controls)?.controls || null;
+    renderSidebar(ui.groupsEl, viewport, { setLayerVisible, setLayerFilter, onEnable, itemControls, decorateRow: exporter ? exporter.decorateRow : undefined });
     if (opts.exportMode === "zone" && detailed) {
       const to2D = () => {
         map.easeTo({ pitch: 0, bearing: 0, duration: 400 });
@@ -2884,7 +2942,7 @@ function createMapLibreBlock(mount, opts) {
 
     // Base border (TASK 16) — dashed-blue reference rectangle on top of the data
     // layers, from web/layers/base_border.json (same on every map).
-    if (!opts.noBaseBorder && viewport === "computational") wireBaseBorderOverlay();
+    if (!opts.noBaseBorder && (viewport === "computational" || viewport === "space_syntax")) wireBaseBorderOverlay();
   });
 
   /** Dashed-blue base-border rectangle for this map, from base_border.json. */
@@ -2892,7 +2950,7 @@ function createMapLibreBlock(mount, opts) {
     if (!map.getSource("__base_border")) {
       map.addSource("__base_border", { type: "geojson", data: _emptyFC() });
       map.addLayer({
-        id: "__base_border_line", type: "line", source: "__base_border",
+        id: "__base_border_line", type: "line", source: "__base_border", layout: _borderLayout(map),
         paint: { "line-color": "#0D0D0D", "line-width": 3, "line-dasharray": [1.4, 1.1] },
       });
     }
@@ -2903,10 +2961,10 @@ function createMapLibreBlock(mount, opts) {
     // Base border 2.0 and the curved border: blue / red so they read apart from the black one.
     if (!map.getSource("__base_border2")) {
       map.addSource("__base_border2", { type: "geojson", data: _emptyFC() });
-      map.addLayer({ id: "__base_border2_line", type: "line", source: "__base_border2",
+      map.addLayer({ id: "__base_border2_line", type: "line", source: "__base_border2", layout: _borderLayout(map),
         paint: { "line-color": "#0F5FB5", "line-width": 2.5, "line-dasharray": [1.4, 1.1] } });
       map.addSource("__base_border_curve", { type: "geojson", data: _emptyFC() });
-      map.addLayer({ id: "__base_border_curve_line", type: "line", source: "__base_border_curve",
+      map.addLayer({ id: "__base_border_curve_line", type: "line", source: "__base_border_curve", layout: _borderLayout(map),
         paint: { "line-color": "#E3262A", "line-width": 2.5, "line-dasharray": [1.4, 1.1] } });
     }
     baseBorder2.subscribe((rect) => {
@@ -2952,7 +3010,14 @@ async function boot() {
 // ---------------------------------------------------------------------------
 const SECTIONS = [
   { id: "combined", title: "Urban Morphology", subtitle: "Buildings, parcels, mobility, districts" },
-  { id: "computational", title: "Simplified Model for Analysis", subtitle: "Precise geometry for Rhino / Grasshopper", startView: "base" },
+  { id: "computational", title: "Simplified Model for Analysis", subtitle: "Precise geometry for Rhino / Grasshopper", startView: "centre",
+    // extra map windows stacked under the main one in the same section (each is its own viewport in layers.json)
+    subMaps: [{ id: "space_syntax", title: "Space Syntax", subtitle: "Roads and counting gates for visual people / traffic counts", startView: "centre",
+      materials: [
+        { label: "Counting sheets (PDF)", href: "materials/counting_sheets.pdf" },
+        { label: "Gate maps (PDF)" },
+        { label: "Counting gates table (Excel)", note: "Paper counting sheet, gate maps and a blank table of the gates for repeat counts." },
+      ] }] },
   { id: "weimar_model", title: "Detailled Buildings (LOD2)", subtitle: "Buildings with roofs", startView: "church",
     exportMode: "zone", noBaseBorder: true, blank: true, noPopups: true },
   { id: "blue_green", title: "Natural Elements", subtitle: "Water, geology, terrain, protected areas" },
@@ -2993,16 +3058,24 @@ function initLanding(mount) {
     stage.hidden = false;
     if (!built.has(id)) {
       built.add(id);
-      createMapLibreBlock(panels.get(id), {
-        title: sec.title, subtitle: sec.subtitle, viewport: id, startView: sec.startView,
-        exportMode: sec.exportMode, noBaseBorder: sec.noBaseBorder, noPopups: sec.noPopups,
-        basemap: sec.blank
+      const build = (host, o) => createMapLibreBlock(host, {
+        title: o.title, subtitle: o.subtitle, viewport: o.id, startView: o.startView,
+        exportMode: o.exportMode, noBaseBorder: o.noBaseBorder, noPopups: o.noPopups, materials: o.materials,
+        basemap: o.blank
           ? { style: { version: 8, sources: {}, layers: [{ id: "__bg", type: "background", paint: { "background-color": "#FFFFFF" } }] }, attribution: "" }
           : { styleUrl: CARTO_POSITRON_STYLE_URL, attribution: CARTO_ATTRIBUTION },
       });
+      build(panels.get(id), sec);
+      for (const sub of sec.subMaps || []) {
+        const subHost = h("div", "stage-sub");
+        panels.get(id).append(subHost);
+        build(subHost, sub);
+      }
     } else {
-      const m = window.__mlMaps && window.__mlMaps[id];
-      if (m) requestAnimationFrame(() => m.resize());
+      for (const vp of [id, ...(sec.subMaps || []).map((x) => x.id)]) {
+        const m = window.__mlMaps && window.__mlMaps[vp];
+        if (m) requestAnimationFrame(() => m.resize());
+      }
     }
     history.replaceState(null, "", "#" + id);
     if (scroll) stage.scrollIntoView({ behavior: "smooth", block: "start" });

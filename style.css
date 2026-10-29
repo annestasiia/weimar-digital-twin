@@ -628,3 +628,44 @@ body, .landing, #stage, .map-meta, .map-block, .map-block .sidebar, .map-block .
 .sub-name { flex: 1; font-size: 12px; }
 .sub-row.off .sub-name { color: var(--text-dim); }
 .layer-row.partial .eye-btn { opacity: 0.55; }
+
+/* second map window stacked under the main one in the same section (e.g. Space Syntax under Simplified Model) */
+.stage-sub { margin-top: 40px; }
+.btn-material { display: block; padding: 8px 10px; border: 1px solid var(--text); font-size: 12px; text-align: center; color: var(--text); text-decoration: none; }
+a.btn-material:hover { background: var(--text); color: #fff; }
+.btn-material.is-soon { border-style: dashed; border-color: var(--border); color: var(--text-dim); cursor: default; }
+
+/* ---- pedestrian counting (Space Syntax window): switches in the sidebar, gate card in the tools ---- */
+.cnt-panel { margin: 6px 0 4px; padding: 8px 10px; border: 1px solid var(--text); background: #FFFFFF; display: flex; flex-direction: column; gap: 7px; }
+.cnt-panel[hidden], .cnt-card[hidden] { display: none; }
+.cnt-row { display: flex; flex-direction: column; gap: 3px; }
+.cnt-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.cnt-seg { display: flex; flex-wrap: wrap; border: 1px solid var(--text); }
+.cnt-seg button { flex: 1 1 auto; padding: 4px 5px; background: #FFFFFF; color: var(--text); border: none; border-right: 1px solid var(--text); border-radius: 0; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.cnt-seg button:last-child { border-right: none; }
+.cnt-seg button:hover:not(:disabled) { background: var(--bg-panel-2); }
+.cnt-seg button.active, .cnt-seg button.active:hover { background: var(--text); color: #FFFFFF; }
+.cnt-seg button:disabled { color: #B5B5B5; cursor: not-allowed; }
+.cnt-seg button.active:disabled { background: #8A8A8A; color: #FFFFFF; }
+.cnt-checks { flex-direction: row; gap: 14px; }
+.cnt-check { display: flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer; }
+.cnt-check input { margin: 0; accent-color: var(--text); }
+.cnt-peak { padding: 5px 6px; background: #FFFFFF; border: 1px solid var(--text); border-radius: 0; font-size: 11px; font-weight: 700; cursor: pointer; text-align: left; }
+.cnt-peak:hover { background: var(--text); color: #FFFFFF; }
+.cnt-legend-bar { height: 10px; border: 1px solid var(--text); }
+.cnt-legend-ticks { display: flex; justify-content: space-between; font-size: 10px; margin-top: 2px; }
+.cnt-note { font-size: 11px; font-style: italic; color: var(--text-dim); }
+.cnt-card-head { display: flex; align-items: center; justify-content: space-between; }
+.tools .cnt-close { width: 24px; height: 24px; padding: 0; font-size: 15px; line-height: 1; }
+.cnt-big { display: flex; flex-direction: column; gap: 2px; }
+.cnt-big-v { font-size: 30px; font-weight: 700; line-height: 1; }
+.cnt-big-t { font-size: 11px; color: var(--text-dim); }
+.cnt-table { width: 100%; border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; }
+.cnt-table th, .cnt-table td { padding: 2px 4px; border-bottom: 1px solid var(--border); text-align: right; }
+.cnt-table th:first-child { text-align: left; }
+.cnt-table tr:first-child th { border-bottom: 1px solid var(--text); font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+.cnt-table tr:first-child th:first-child { text-transform: none; letter-spacing: 0; font-size: 11px; }
+.cnt-table td.avg { color: var(--text-dim); }
+.cnt-table td.filled { font-style: italic; color: #A0522D; cursor: help; }
+.cnt-table td.cur { background: var(--text); color: #FFFFFF; }
+.cnt-stats { font-size: 11px; line-height: 1.4; }
